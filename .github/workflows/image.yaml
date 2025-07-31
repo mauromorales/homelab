@@ -28,6 +28,5 @@ jobs:
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
       summary_artifacts: true
-      version: "0.1.0"
       kubernetes_distro: "k0s"
       kubernetes_version: "1.33.3"
