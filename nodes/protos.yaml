@@ -1,0 +1,17 @@
+#cloud-config
+hostname: "protos"
+
+install:
+  auto: true
+  reboot: true
+  device: /dev/vda
+
+users:
+  - name: "kairos"
+    ssh_authorized_keys: github:mauromorales
+
+k0s:
+  enabled: true
+  args:
+    - --enable-worker
+    - --no-taints

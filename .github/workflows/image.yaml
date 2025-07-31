@@ -2,9 +2,15 @@ name: 'Build Homelab images'
 
 on:
   pull_request:
+    paths:
+      - 'images/Dockerfile'
   push:
     branches:
       - main
+    paths:
+      - 'images/Dockerfile'
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
