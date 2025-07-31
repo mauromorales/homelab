@@ -1,0 +1,33 @@
+name: 'Build Homelab images'
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  security-events: write
+  id-token: write
+  actions: read
+jobs:
+  build:
+    name: Docker Build
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@main
+    secrets:
+      registry_username: ${{ secrets.REGISTRY_USERNAME }}
+      registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+    with:
+      base_image: ubuntu:24.04
+      model: "generic"
+      arch: "amd64"
+      version: "auto"
+      iso: true
+      grype: true
+      registry_domain: "quay.io"
+      registry_namespace: "mauromorales"
+      summary_artifacts: true
+      version: "0.1.0"
+      kubernetes_distro: "k0s"
+      kubernetes_version: "1.33.3"
