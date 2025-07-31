@@ -22,7 +22,7 @@ jobs:
       base_image: ubuntu:24.04
       model: "generic"
       arch: "amd64"
-      version: "auto"
+      version: "0.1.0"
       iso: true
       grype: true
       registry_domain: "quay.io"
