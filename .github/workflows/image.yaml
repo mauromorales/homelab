@@ -29,4 +29,4 @@ jobs:
       registry_namespace: "mauromorales"
       summary_artifacts: true
       kubernetes_distro: "k0s"
-      kubernetes_version: "v1.33.3"
+      kubernetes_version: "v1.33.3+k0s.0"
