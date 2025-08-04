@@ -1,17 +1,37 @@
 #cloud-config
+
 hostname: "protos"
 
 install:
   auto: true
   reboot: true
-  device: /dev/vda
+  device: auto
 
 users:
-  - name: "kairos"
-    ssh_authorized_keys: github:mauromorales
+  - name: "mauro"
+    ssh_authorized_keys: 
+      - github:mauromorales
 
 k0s:
   enabled: true
   args:
     - --enable-worker
     - --no-taints
+
+stages:
+  initramfs:
+    - name: "Set KUBECONFIG for root user"
+      files:
+        - path: /root/.bashrc
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            # Set KUBECONFIG for k0s access
+            if [ -z "$KUBECONFIG" ]; then
+                if [ -e /etc/k0s/kubeconfig.yaml ]; then
+                    export KUBECONFIG="/etc/k0s/kubeconfig.yaml"
+                elif k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml 2>/dev/null; then
+                    export KUBECONFIG="/etc/k0s/kubeconfig.yaml"
+                fi
+            fi
