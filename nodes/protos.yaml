@@ -6,6 +6,7 @@ install:
   auto: true
   reboot: true
   device: auto
+  grub-entry-name: Logos
 
 bundles:
   - targets:
@@ -23,7 +24,10 @@ k0s:
     - --no-taints
 
 stages:
-  initramfs:
+  boot:
+    - name: "Enable mDNS services"
+      commands: |
+        systemctl enable --now avahi-daemon || true
     - name: "Generate k0s kubeconfig"
       commands: |
         if k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml 2>/dev/null; then
@@ -44,5 +48,5 @@ stages:
         if [ -e /etc/k0s/kubeconfig.yaml ]; then
           curl -X POST -H "Content-Type: application/json" \
             -d "$(jq -n --arg path "/nodes/protos/kubeconfig.yaml" --arg content "$(cat /etc/k0s/kubeconfig.yaml)" '{path: $path, content: $content}')" \
-            http://192.168.68.61:8080/api/storage
+            http://epictetus.local:8080/api/storage
         fi

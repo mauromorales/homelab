@@ -54,6 +54,9 @@ jobs:
       grype: true
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
+      registry_repository: "logos"
       summary_artifacts: true
       kubernetes_distro: "k0s"
       kubernetes_version: "v1.33.3+k0s.0"
+      custom_tag_format: "$VERSION"
+      custom_artifact_format: "logos-$VERSION"
