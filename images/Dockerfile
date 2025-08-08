@@ -1,10 +1,10 @@
 FROM ubuntu:24.04
 
 RUN apt-get update && apt-get install -y \
-    avahi-daemon \
     ca-certificates \
     curl \
-    git \
+    # to advertise the hostname on the local network
+    avahi-daemon \
     libnss-mdns \
     && rm -rf /var/lib/apt/lists/*
 

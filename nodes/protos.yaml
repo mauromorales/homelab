@@ -25,7 +25,7 @@ k0s:
 
 stages:
   boot:
-    - name: "Enable mDNS services"
+    - name: "Enable mDNS services to advertise hostname on local network"
       commands: |
         systemctl enable --now avahi-daemon || true
     - name: "Generate k0s kubeconfig"
