@@ -7,6 +7,10 @@ install:
   reboot: true
   device: auto
 
+bundles:
+  - targets:
+      - run://quay.io/kairos/community-bundles:kairos-operator_latest
+
 users:
   - name: "mauro"
     ssh_authorized_keys: 
@@ -20,18 +24,25 @@ k0s:
 
 stages:
   initramfs:
+    - name: "Generate k0s kubeconfig"
+      commands: |
+        if k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml 2>/dev/null; then
+          chmod 0644 /etc/k0s/kubeconfig.yaml
+          chown root:root /etc/k0s/kubeconfig.yaml
+        fi
     - name: "Set KUBECONFIG for root user"
-      files:
-        - path: /root/.bashrc
-          permissions: 0644
-          owner: 0
-          group: 0
-          content: |
-            # Set KUBECONFIG for k0s access
-            if [ -z "$KUBECONFIG" ]; then
-                if [ -e /etc/k0s/kubeconfig.yaml ]; then
-                    export KUBECONFIG="/etc/k0s/kubeconfig.yaml"
-                elif k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml 2>/dev/null; then
-                    export KUBECONFIG="/etc/k0s/kubeconfig.yaml"
-                fi
-            fi
+      commands: |
+        if [ -f /etc/k0s/kubeconfig.yaml ]; then
+          if ! grep -q '^export KUBECONFIG="/etc/k0s/kubeconfig.yaml"' /root/.bashrc 2>/dev/null; then
+            printf '\nexport KUBECONFIG="/etc/k0s/kubeconfig.yaml"\n' >> /root/.bashrc
+            chmod 0644 /root/.bashrc
+            chown root:root /root/.bashrc
+          fi
+        fi
+    - name: "Save KUBECONFIG on external storage"
+      commands: |
+        if [ -e /etc/k0s/kubeconfig.yaml ]; then
+          curl -X POST -H "Content-Type: application/json" \
+            -d "$(jq -n --arg path "/nodes/protos/kubeconfig.yaml" --arg content "$(cat /etc/k0s/kubeconfig.yaml)" '{path: $path, content: $content}')" \
+            http://192.168.68.61:8080/api/storage
+        fi
