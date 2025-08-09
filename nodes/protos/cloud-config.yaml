@@ -6,7 +6,8 @@ install:
   auto: true
   reboot: true
   device: auto
-  grub-entry-name: Logos
+  grub_options:
+    default_menu_entry: "Protos"
 
 bundles:
   - targets:
@@ -14,6 +15,7 @@ bundles:
 
 users:
   - name: "mauro"
+    groups: ["admin"]
     ssh_authorized_keys: 
       - github:mauromorales
 
@@ -24,10 +26,12 @@ k0s:
     - --no-taints
 
 stages:
-  boot:
+  initramfs:
     - name: "Enable mDNS services to advertise hostname on local network"
-      commands: |
-        systemctl enable --now avahi-daemon || true
+      systemctl:
+        enable:
+          - avahi-daemon
+  'provider-kairos.bootstrap.after.k0s-ready':
     - name: "Generate k0s kubeconfig"
       commands: |
         if k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml 2>/dev/null; then

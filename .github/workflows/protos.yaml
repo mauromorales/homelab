@@ -6,7 +6,11 @@ on:
       - 'main'
     tags:
       - 'v*'
+    paths:
+      - 'nodes/protos/**'
   pull_request:
+    paths:
+      - 'nodes/protos/**'
 
 permissions:
   contents: write
@@ -41,7 +45,7 @@ jobs:
   kairos:
     name: Kairos Factory
     needs: base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@main
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@cloud-config
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -54,9 +58,11 @@ jobs:
       grype: true
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
-      registry_repository: "logos"
+      registry_repository: "protos"
       summary_artifacts: true
       kubernetes_distro: "k0s"
       kubernetes_version: "v1.33.3+k0s.0"
       custom_tag_format: "$VERSION"
-      custom_artifact_format: "logos-$VERSION"
+      custom_artifact_format: "protos-$VERSION"
+      cloud_config: nodes/protos/cloud-config.yaml
+
