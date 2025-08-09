@@ -18,7 +18,7 @@ permissions:
   id-token: write
   actions: read
 jobs:
-  base:
+  ubuntu:
     name: Base Image
     runs-on: ubuntu-latest
     steps:
@@ -42,10 +42,10 @@ jobs:
           tags: quay.io/mauromorales/ubuntu:24.04-${{ github.sha }}
           push: true
 
-  kairos:
+  protos:
     name: Kairos Factory
-    needs: base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@cloud-config
+    needs: ubuntu
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@custom-job-name-format
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -64,5 +64,6 @@ jobs:
       kubernetes_version: "v1.33.3+k0s.0"
       custom_tag_format: "$VERSION"
       custom_artifact_format: "protos-$VERSION"
+      custom_job_name_format: "protos"
       cloud_config: nodes/protos/cloud-config.yaml
 
