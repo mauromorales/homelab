@@ -38,7 +38,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64, linux/arm64
-          file: images/Dockerfile
+          file: nodes/protos/Dockerfile
           tags: quay.io/mauromorales/ubuntu:24.04-${{ github.sha }}
           push: true
 
