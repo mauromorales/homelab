@@ -34,7 +34,7 @@ stages:
           - avahi-daemon
     - name: "Generate k0s kubeconfig script"
       files:
-        - path: /usr/bin/k0s-kubeconfig
+        - path: /usr/local/bin/k0s-kubeconfig
           permissions: 0755
           owner: 0
           group: 0
@@ -43,7 +43,7 @@ stages:
             k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml 2>/dev/null
     - name: "Export KUBECONFIG for root user"
       files:
-        - path: /usr/bin/k0s-export-kubeconfig-root
+        - path: /usr/local/bin/k0s-export-kubeconfig-root
           permissions: 0755
           owner: 0
           group: 0
@@ -57,7 +57,7 @@ stages:
             fi
     - name: "Save KUBECONFIG on external storage script"
       files:
-        - path: /usr/bin/k0s-save-kubeconfig-on-external-storage
+        - path: /usr/local/bin/k0s-save-kubeconfig-on-external-storage
           permissions: 0755
           owner: 0
           group: 0
@@ -84,7 +84,7 @@ stages:
             [Service]
             Type=oneshot
             RemainAfterExit=yes
-            ExecStart=/usr/bin/k0s-kubeconfig
+            ExecStart=/usr/local/bin/k0s-kubeconfig
 
             [Install]
             WantedBy=multi-user.target
@@ -103,7 +103,7 @@ stages:
             [Service]
             Type=oneshot
             RemainAfterExit=yes
-            ExecStart=/usr/bin/k0s-export-kubeconfig-root
+            ExecStart=/usr/local/bin/k0s-export-kubeconfig-root
 
             [Install]
             WantedBy=k0s-kubeconfig.service
@@ -122,7 +122,7 @@ stages:
             [Service]
             Type=oneshot
             RemainAfterExit=yes
-            ExecStart=/usr/bin/k0s-save-kubeconfig-on-external-storage
+            ExecStart=/usr/local/bin/k0s-save-kubeconfig-on-external-storage
 
             [Install]
             WantedBy=k0s-kubeconfig.service
