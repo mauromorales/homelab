@@ -45,7 +45,7 @@ jobs:
   protos:
     name: Kairos Factory
     needs: ubuntu
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@custom-job-name-format
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.5
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
