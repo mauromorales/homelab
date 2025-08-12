@@ -85,6 +85,8 @@ jobs:
       registry_namespace: "mauromorales"
       registry_repository: "kairos"
       summary_artifacts: true
+      kubernetes_distro: "k0s"
+      kubernetes_version: "v1.33.3+k0s.0"
       custom_tag_format: "$KAIROS_VERSION"
       custom_artifact_format: "kairos-$KAIROS_VERSION"
       custom_job_name_format: "kairos"
