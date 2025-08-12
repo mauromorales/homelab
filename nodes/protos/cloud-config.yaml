@@ -7,7 +7,7 @@ install:
   reboot: true
   device: auto
   grub_options:
-    default_menu_entry: "Protos"
+    default_menu_entry: "ProtOS"
 
 bundles:
   - targets:
