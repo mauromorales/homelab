@@ -6,11 +6,7 @@ on:
       - 'main'
     tags:
       - 'v*'
-    paths:
-      - 'nodes/protos/**'
   pull_request:
-    paths:
-      - 'nodes/protos/**'
 
 permissions:
   contents: write
