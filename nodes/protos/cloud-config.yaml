@@ -40,37 +40,25 @@ stages:
           group: 0
           content: |
             #!/bin/sh
+            # Generate k0s kubeconfig
+            echo "Generating k0s kubeconfig..."
             k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml
-    - name: "Export KUBECONFIG for root user"
-      files:
-        - path: /usr/local/bin/k0s-export-kubeconfig-root
-          permissions: 0755
-          owner: 0
-          group: 0
-          content: |
-            #!/bin/sh
+            echo "KUBECONFIG generated"
             # Append KUBECONFIG to root's .bashrc if it doesn't exist
+            echo "Saving KUBECONFIG to external storage..."
             if ! grep -q '^export KUBECONFIG="/etc/k0s/kubeconfig.yaml"' /root/.bashrc 2>/dev/null; then
               printf '\nexport KUBECONFIG="/etc/k0s/kubeconfig.yaml"\n' >> /root/.bashrc
-              chmod 0644 /root/.bashrc
-              chown root:root /root/.bashrc
             fi
-    - name: "Save KUBECONFIG on external storage script"
-      files:
-        - path: /usr/local/bin/k0s-save-kubeconfig-on-external-storage
-          permissions: 0755
-          owner: 0
-          group: 0
-          content: |
-            #!/bin/sh
-            if [ -e /etc/k0s/kubeconfig.yaml ]; then
-              curl -X POST -H "Content-Type: application/json" \
-                -d "$(jq -n --arg path "/nodes/protos/kubeconfig.yaml" --arg content "$(cat /etc/k0s/kubeconfig.yaml)" '{path: $path, content: $content}')" \
-                http://epictetus.local:8080/api/storage
-            fi
+            echo "KUBECONFIG saved to root's .bashrc"
+            # Save KUBECONFIG to external storage
+            echo "Saving KUBECONFIG to external storage..."
+            curl -X POST -H "Content-Type: application/json" \
+              -d "$(jq -n --arg path "/nodes/protos/kubeconfig.yaml" --arg content "$(cat /etc/k0s/kubeconfig.yaml)" '{path: $path, content: $content}')" \
+              http://epictetus.local:8080/api/storage
+            echo "KUBECONFIG saved to root's .bashrc"
     - name: "Watch for k0s admin.conf changes"
       files:
-        - path: /etc/systemd/system/k0s-pki-ready.path
+        - path: /etc/systemd/system/k0s-kubeconfig.path
           permissions: 0644
           owner: 0
           group: 0
@@ -93,7 +81,6 @@ stages:
           content: |
             [Unit]
             Description=Generate k0s kubeconfig
-            After=k0s-pki-ready.path
 
             [Service]
             Type=oneshot
@@ -104,64 +91,8 @@ stages:
 
             [Install]
             WantedBy=multi-user.target
-    - name: "Watch for k0s kubeconfig.yaml changes"
-      files:
-        - path: /etc/systemd/system/k0s-kubeconfig-ready.path
-          permissions: 0644
-          owner: 0
-          group: 0
-          content: |
-            [Unit]
-            Description=Watch for k0s kubeconfig.yaml
-
-            [Path]
-            PathChanged=/etc/k0s/kubeconfig.yaml
-            PathExists=/etc/k0s/kubeconfig.yaml
-
-            [Install]
-            WantedBy=multi-user.target
-    - name: "Call k0s-export-kubeconfig-root script on k0s-kubeconfig-ready.path"
-      files:
-        - path: /etc/systemd/system/k0s-export-kubeconfig-root.service
-          permissions: 0644
-          owner: 0
-          group: 0
-          content: |
-            [Unit]
-            Description=Export KUBECONFIG for root user
-            After=k0s-kubeconfig-ready.path
-
-            [Service]
-            Type=oneshot
-            RemainAfterExit=yes
-            ExecStart=/usr/local/bin/k0s-export-kubeconfig-root
-
-            [Install]
-            WantedBy=multi-user.target
-    - name: "Call k0s-save-kubeconfig-on-external-storage script on k0s-kubeconfig-ready.path"
-      files:
-        - path: /etc/systemd/system/k0s-save-kubeconfig-on-external-storage.service
-          permissions: 0644
-          owner: 0
-          group: 0
-          content: |
-            [Unit]
-            Description=Save KUBECONFIG on external storage
-            After=k0s-kubeconfig-ready.path
-            ConditionPathExists=/etc/k0s/kubeconfig.yaml
-
-            [Service]
-            Type=oneshot
-            RemainAfterExit=yes
-            ExecStart=/usr/local/bin/k0s-save-kubeconfig-on-external-storage
-
-            [Install]
-            WantedBy=multi-user.target
 
     - name: "Enable k0s kubeconfig related units"
       commands:
-        - ln -sf /etc/systemd/system/k0s-pki-ready.path /etc/systemd/system/multi-user.target.wants/k0s-pki-ready.path
-        - ln -sf /etc/systemd/system/k0s-kubeconfig.service /etc/systemd/system/k0s-pki-ready.path.wants/k0s-kubeconfig.service
-        - ln -sf /etc/systemd/system/k0s-kubeconfig-ready.path /etc/systemd/system/multi-user.target.wants/k0s-kubeconfig-ready.path
-        - ln -sf /etc/systemd/system/k0s-export-kubeconfig-root.service /etc/systemd/system/k0s-kubeconfig-ready.path.wants/k0s-export-kubeconfig-root.service
-        - ln -sf /etc/systemd/system/k0s-save-kubeconfig-on-external-storage.service /etc/systemd/system/k0s-kubeconfig-ready.path.wants/k0s-save-kubeconfig-on-external-storage.service
+        - ln -sf /etc/systemd/system/k0s-kubeconfig.path /etc/systemd/system/multi-user.target.wants/k0s-kubeconfig.path
+        - ln -sf /etc/systemd/system/k0s-kubeconfig.service /etc/systemd/system/multi-user.target.wants/k0s-kubeconfig.service
