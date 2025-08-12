@@ -2,6 +2,8 @@
 
 My personal homelab.
 
+![hegemonikon-logo](./assets/hegemonikon-logo.png)
+
 ---
 
 ## Why Hegemonikon?
