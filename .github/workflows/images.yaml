@@ -6,7 +6,11 @@ on:
       - 'main'
     tags:
       - 'v*'
+    paths:
+      - 'nodes/protos/**'
   pull_request:
+    paths:
+      - 'nodes/protos/**'
 
 permissions:
   contents: write
@@ -14,7 +18,7 @@ permissions:
   id-token: write
   actions: read
 jobs:
-  base:
+  ubuntu:
     name: Base Image
     runs-on: ubuntu-latest
     steps:
@@ -34,14 +38,14 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           platforms: linux/amd64, linux/arm64
-          file: images/Dockerfile
+          file: nodes/protos/Dockerfile
           tags: quay.io/mauromorales/ubuntu:24.04-${{ github.sha }}
           push: true
 
-  kairos:
+  protos:
     name: Kairos Factory
-    needs: base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@main
+    needs: ubuntu
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.6
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -54,9 +58,35 @@ jobs:
       grype: true
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
-      registry_repository: "logos"
+      registry_repository: "protos"
       summary_artifacts: true
       kubernetes_distro: "k0s"
       kubernetes_version: "v1.33.3+k0s.0"
       custom_tag_format: "$VERSION"
-      custom_artifact_format: "logos-$VERSION"
+      custom_artifact_format: "protos-$VERSION"
+      custom_job_name_format: "protos"
+      cloud_config: nodes/protos/cloud-config.yaml
+
+  kairos:
+    name: Kairos Factory
+    needs: ubuntu
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.6
+    secrets:
+      registry_username: ${{ secrets.REGISTRY_USERNAME }}
+      registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+    with:
+      base_image: quay.io/mauromorales/ubuntu:24.04-${{ github.sha }}
+      model: "generic"
+      arch: "amd64"
+      version: "auto"
+      iso: true
+      grype: true
+      registry_domain: "quay.io"
+      registry_namespace: "mauromorales"
+      registry_repository: "kairos"
+      summary_artifacts: true
+      kubernetes_distro: "k0s"
+      kubernetes_version: "v1.33.3+k0s.0"
+      custom_tag_format: "$KAIROS_VERSION"
+      custom_artifact_format: "kairos-$KAIROS_VERSION"
+      custom_job_name_format: "kairos"
