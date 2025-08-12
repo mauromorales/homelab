@@ -45,7 +45,7 @@ jobs:
   protos:
     name: Kairos Factory
     needs: ubuntu
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.5
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.6
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -67,3 +67,24 @@ jobs:
       custom_job_name_format: "protos"
       cloud_config: nodes/protos/cloud-config.yaml
 
+  kairos:
+    name: Kairos Factory
+    needs: ubuntu
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.6
+    secrets:
+      registry_username: ${{ secrets.REGISTRY_USERNAME }}
+      registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+    with:
+      base_image: quay.io/mauromorales/ubuntu:24.04-${{ github.sha }}
+      model: "generic"
+      arch: "amd64"
+      version: "auto"
+      iso: true
+      grype: true
+      registry_domain: "quay.io"
+      registry_namespace: "mauromorales"
+      registry_repository: "kairos"
+      summary_artifacts: true
+      custom_tag_format: "$KAIROS_VERSION"
+      custom_artifact_format: "kairos-$KAIROS_VERSION"
+      custom_job_name_format: "kairos"
