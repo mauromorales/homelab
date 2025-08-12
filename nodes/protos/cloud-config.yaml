@@ -40,22 +40,47 @@ stages:
           group: 0
           content: |
             #!/bin/sh
-            # Generate k0s kubeconfig
-            echo "Generating k0s kubeconfig..."
-            k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml
-            echo "KUBECONFIG generated"
-            # Append KUBECONFIG to root's .bashrc if it doesn't exist
-            echo "Saving KUBECONFIG to external storage..."
-            if ! grep -q '^export KUBECONFIG="/etc/k0s/kubeconfig.yaml"' /root/.bashrc 2>/dev/null; then
-              printf '\nexport KUBECONFIG="/etc/k0s/kubeconfig.yaml"\n' >> /root/.bashrc
+            echo "Checking if admin.conf exists and is not empty..."
+            if [ ! -f "/var/lib/k0s/pki/admin.conf" ] || [ ! -s "/var/lib/k0s/pki/admin.conf" ]; then
+              echo "Error: admin config '/var/lib/k0s/pki/admin.conf' not found or empty, check if the control plane is initialized on this node"
+              exit 1
             fi
-            echo "KUBECONFIG saved to root's .bashrc"
-            # Save KUBECONFIG to external storage
-            echo "Saving KUBECONFIG to external storage..."
-            curl -X POST -H "Content-Type: application/json" \
-              -d "$(jq -n --arg path "/nodes/protos/kubeconfig.yaml" --arg content "$(cat /etc/k0s/kubeconfig.yaml)" '{path: $path, content: $content}')" \
-              http://epictetus.local:8080/api/storage
-            echo "KUBECONFIG saved to root's .bashrc"
+            echo "admin.conf found, proceeding with kubeconfig generation..."
+            
+            k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml
+            echo "/etc/k0s/kubeconfig.yaml generated, saving to root's .bashrc and external storage..."
+
+            if ! grep -q '^export KUBECONFIG="/etc/k0s/kubeconfig.yaml"' /root/.bashrc 2>/dev/null; then
+              echo "KUBECONFIG not found in root's .bashrc, adding it..."
+              printf '\nexport KUBECONFIG="/etc/k0s/kubeconfig.yaml"\n' >> /root/.bashrc
+            else
+              echo "KUBECONFIG found in root's .bashrc, no need to add it"
+            fi
+            
+            echo "Comparing KUBECONFIG with external storage..."
+            
+            # Check if the external storage endpoint is available
+            if ! curl -s -f -o /tmp/external_kubeconfig.yaml http://epictetus.local:8080/api/storage/nodes/protos/kubeconfig.yaml; then
+              echo "Warning: External storage server is not available (epictetus.local:8080)"
+              echo "Skipping kubeconfig comparison and update"
+              rm -f /tmp/external_kubeconfig.yaml
+            else
+              # Compare local kubeconfig with external storage
+              if [ "$(cat /etc/k0s/kubeconfig.yaml)" != "$(cat /tmp/external_kubeconfig.yaml)" ]; then
+                echo "KUBECONFIG differs from external storage, updating..."
+                if curl -X POST -H "Content-Type: application/json" \
+                  -d "$(jq -n --arg path "/nodes/protos/kubeconfig.yaml" --arg content "$(cat /etc/k0s/kubeconfig.yaml)" '{path: $path, content: $content}')" \
+                  http://epictetus.local:8080/api/storage; then
+                  echo "Successfully updated kubeconfig in external storage"
+                else
+                  echo "Error: Failed to update kubeconfig in external storage"
+                fi
+              else
+                echo "KUBECONFIG is the same as external storage, no need to update"
+              fi
+              rm -f /tmp/external_kubeconfig.yaml
+            fi
+
     - name: "Watch for k0s admin.conf changes"
       files:
         - path: /etc/systemd/system/k0s-kubeconfig.path
@@ -81,13 +106,16 @@ stages:
           content: |
             [Unit]
             Description=Generate k0s kubeconfig
+            After=k0scontroller.service
 
             [Service]
             Type=oneshot
             RemainAfterExit=yes
             ExecStart=/usr/local/bin/k0s-kubeconfig
             Restart=on-failure
-            RestartSec=5s
+            RestartSec=30s
+            StartLimitInterval=300s
+            StartLimitBurst=10
 
             [Install]
             WantedBy=multi-user.target
