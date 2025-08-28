@@ -1,0 +1,170 @@
+#cloud-config
+
+hostname: "noos"
+
+install:
+  auto: true
+  reboot: true
+  device: auto
+  grub_options:
+    default_menu_entry: "NoOS"
+
+bundles:
+  - targets:
+      - run://quay.io/kairos/community-bundles:kairos-operator_latest
+      - run://quay.io/kairos/community-bundles:k9s_latest
+
+users:
+  - name: "mauro"
+    groups: ["admin"]
+    ssh_authorized_keys: 
+      - github:mauromorales
+
+k0s:
+  enabled: true
+  args:
+    - --single
+
+stages:
+  initramfs:
+    - name: "Enable mDNS services to advertise hostname on local network"
+      systemctl:
+        enable:
+          - avahi-daemon
+    - name: "Generate k0s kubeconfig script"
+      files:
+        - path: /usr/local/bin/k0s-kubeconfig
+          permissions: 0755
+          owner: 0
+          group: 0
+          content: |
+            #!/bin/sh
+            echo "Checking if admin.conf exists and is not empty..."
+            if [ ! -f "/var/lib/k0s/pki/admin.conf" ] || [ ! -s "/var/lib/k0s/pki/admin.conf" ]; then
+              echo "Error: admin config '/var/lib/k0s/pki/admin.conf' not found or empty, check if the control plane is initialized on this node"
+              exit 1
+            fi
+            echo "admin.conf found, proceeding with kubeconfig generation..."
+            
+            k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml
+            echo "/etc/k0s/kubeconfig.yaml generated, saving to root's .bashrc and external storage..."
+
+            if ! grep -q '^export KUBECONFIG="/etc/k0s/kubeconfig.yaml"' /root/.bashrc 2>/dev/null; then
+              echo "KUBECONFIG not found in root's .bashrc, adding it..."
+              printf '\nexport KUBECONFIG="/etc/k0s/kubeconfig.yaml"\n' >> /root/.bashrc
+            else
+              echo "KUBECONFIG found in root's .bashrc, no need to add it"
+            fi
+
+    - name: "Watch for k0s admin.conf changes"
+      files:
+        - path: /etc/systemd/system/k0s-kubeconfig.path
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            [Unit]
+            Description=Watch for k0s admin.conf
+
+            [Path]
+            PathChanged=/var/lib/k0s/pki/admin.conf
+            PathExists=/var/lib/k0s/pki/admin.conf
+
+            [Install]
+            WantedBy=multi-user.target
+    - name: "Call k0s-kubeconfig script on k0s admin.conf changes"
+      files:
+        - path: /etc/systemd/system/k0s-kubeconfig.service
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            [Unit]
+            Description=Generate k0s kubeconfig
+            After=k0scontroller.service
+
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/usr/local/bin/k0s-kubeconfig
+            Restart=on-failure
+            RestartSec=30s
+            StartLimitInterval=300s
+            StartLimitBurst=10
+
+            [Install]
+            WantedBy=multi-user.target
+
+    - name: "Enable k0s kubeconfig related units"
+      commands:
+        - ln -sf /etc/systemd/system/k0s-kubeconfig.path /etc/systemd/system/multi-user.target.wants/k0s-kubeconfig.path
+        - ln -sf /etc/systemd/system/k0s-kubeconfig.service /etc/systemd/system/multi-user.target.wants/k0s-kubeconfig.service
+    - name: "Add LocalAI deployment"
+      files:
+        - path: /var/lib/k0s/manifests/local-ai/deployment.yaml
+          content: |
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: local-ai
+            ---
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: models-pvc
+              namespace: local-ai
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+            ---
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: local-ai
+              namespace: local-ai
+              labels:
+                app: local-ai
+            spec:
+              selector:
+                matchLabels:
+                  app: local-ai
+              replicas: 1
+              template:
+                metadata:
+                  labels:
+                    app: local-ai
+                  name: local-ai
+                spec:
+                  containers:
+                    - args:
+                      - phi-2
+                      env:
+                      - name: DEBUG
+                        value: "true"
+                      name: local-ai
+                      image: quay.io/go-skynet/local-ai:master
+                      imagePullPolicy: IfNotPresent
+                      volumeMounts:
+                        - name: models-volume
+                          mountPath: /build/models
+                  volumes:
+                    - name: models-volume
+                      persistentVolumeClaim:
+                        claimName: models-pvc
+            ---
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: local-ai
+              namespace: local-ai
+            spec:
+              selector:
+                app: local-ai
+              type: LoadBalancer
+              ports:
+                - protocol: TCP
+                  port: 8080
+                  targetPort: 8080
