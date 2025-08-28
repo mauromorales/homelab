@@ -1,0 +1,105 @@
+#cloud-config
+
+hostname: "thuroros"
+
+install:
+  auto: true
+  reboot: true
+  device: /dev/vda
+
+users:
+  - name: "mauro"
+    groups: ["admin"]
+    ssh_authorized_keys: 
+      - github:mauromorales
+
+stages:
+  initramfs:
+    - name: "Generate k0s kubeconfig script"
+      files:
+        - path: /usr/local/bin/doorbell
+          permissions: 0755
+          owner: 0
+          group: 0
+          content: |
+            #!/usr/bin/env python3
+            import lgpio as GPIO
+            import time
+            import requests
+            import json
+            from datetime import datetime
+            import pytz
+
+            # GPIO Setup
+            GPIO_PIN = 23
+            h = GPIO.gpiochip_open(0)
+            GPIO.gpio_claim_input(h, GPIO_PIN, GPIO.SET_PULL_UP)
+
+            def notify(message):
+                """Send a doorbell message to mowa which sends it to my phone."""
+                
+                # API endpoint
+                url = "http://epictetus.local:8080/api/messages"
+                
+                # JSON payload
+                payload = {
+                    "to": ["mauro"],
+                    "message": message
+                }
+                
+                # Headers for JSON content
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                
+                try:
+                    # Send POST request
+                    response = requests.post(url, json=payload, headers=headers)
+                    
+                    # Check if request was successful
+                    if response.status_code == 200:
+                        print(f"✅ Doorbell message sent successfully!")
+                    else:
+                        print(f"❌ Failed to send doorbell message. Status code: {response.status_code}")
+                        
+                except requests.exceptions.ConnectionError:
+                    print("❌ Connection error: Could not connect to epictetus.local")
+                except requests.exceptions.RequestException as e:
+                    print(f"❌ Request error: {e}")
+                except Exception as e:
+                    print(f"❌ Unexpected error: {e}")
+
+            print("🚀 Doorbell monitor started...")
+            while True:
+                if GPIO.gpio_read(h, GPIO_PIN) == 0:  # Button pressed
+                    brussels_tz = pytz.timezone('Europe/Brussels')
+                    timestamp = datetime.now(brussels_tz).strftime("%Y-%m-%d %H:%M:%S")
+                    message = f"🔔 Someone is at the door 🚪"
+                    print(f"[{timestamp}] {message}")
+                    notify(message)
+                    time.sleep(2)  # Avoid spamming messages
+                time.sleep(0.1)
+    - name: "Add doorbell service"
+      files:
+        - path: /etc/systemd/system/doorbell.service
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            [Unit]
+            Description=Doorbell service
+            Wants=network-online.target
+            After=network-online.target
+
+            [Service]
+            Type=simple
+            ExecStart=/usr/local/bin/doorbell
+            Restart=always
+            RestartSec=2
+            SyslogIdentifier=doorbell
+
+            [Install]
+            WantedBy=multi-user.target
+    - name: "Enable doorbell service"
+      commands:
+        - ln -sf /etc/systemd/system/doorbell.service /etc/systemd/system/multi-user.target.wants/doorbell.service
