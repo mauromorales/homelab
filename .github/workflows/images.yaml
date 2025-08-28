@@ -15,7 +15,6 @@ permissions:
   actions: read
 jobs:
   kairos-base:
-    name: Build Base Image
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -38,7 +37,6 @@ jobs:
           tags: quay.io/mauromorales/kairos:base-${{ github.sha }}
           push: true
   protos-base:
-    name: Build Base Image
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -61,7 +59,6 @@ jobs:
           tags: quay.io/mauromorales/protos:base-${{ github.sha }}
           push: true
   thuroros-base:
-    name: Build Base Image
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
@@ -84,7 +81,6 @@ jobs:
           tags: quay.io/mauromorales/thuroros:base-${{ github.sha }}
           push: true
   noos-base:
-    name: Build Base Image
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
