@@ -111,7 +111,7 @@ jobs:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
     with:
-      base_image: quay.io/mauromorales/ubuntu:24.04-${{ github.sha }}
+      base_image: quay.io/mauromorales/kairos:base-${{ github.sha }}
       model: "generic"
       arch: "amd64"
       version: "auto"
