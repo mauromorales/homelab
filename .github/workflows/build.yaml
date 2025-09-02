@@ -151,7 +151,7 @@ jobs:
   thuroros:
     name: Kairos Factory
     needs: thuroros-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.7
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@dockerfile.img
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
