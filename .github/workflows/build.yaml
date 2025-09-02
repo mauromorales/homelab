@@ -191,5 +191,5 @@ jobs:
       kubernetes_distro: "k0s"
       kubernetes_version: "v1.33.3+k0s.0"
       custom_tag_format: "$KAIROS_VERSION"
-      custom_artifact_format: "kairos-$KAIROS_VERSION"
-      custom_job_name_format: "kairos"
+      custom_artifact_format: "noos-$KAIROS_VERSION"
+      custom_job_name_format: "noos"
