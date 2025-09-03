@@ -193,3 +193,4 @@ jobs:
       custom_tag_format: "$VERSION"
       custom_artifact_format: "noos-$VERSION"
       custom_job_name_format: "noos"
+      cloud_config: nodes/noos/cloud-config.yaml
