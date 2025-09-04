@@ -1,0 +1,345 @@
+#cloud-config
+
+hostname: "noos"
+
+install:
+  auto: true
+  reboot: true
+  device: auto
+  grub_options:
+    default_menu_entry: "NoOS"
+
+bundles:
+  - targets:
+      - run://quay.io/kairos/community-bundles:kairos-operator_latest
+      - run://quay.io/kairos/community-bundles:k9s_latest
+
+users:
+  - name: "mauro"
+    groups: ["admin"]
+    ssh_authorized_keys: 
+      - github:mauromorales
+
+k0s:
+  enabled: true
+  args:
+    - --enable-worker
+    - --no-taints
+
+stages:
+  initramfs:
+    - name: "Enable mDNS services to advertise hostname on local network"
+      systemctl:
+        enable:
+          - avahi-daemon
+    - name: "Generate k0s kubeconfig script"
+      files:
+        - path: /usr/local/bin/k0s-kubeconfig
+          permissions: 0755
+          owner: 0
+          group: 0
+          content: |
+            #!/bin/sh
+            echo "Checking if admin.conf exists and is not empty..."
+            if [ ! -f "/var/lib/k0s/pki/admin.conf" ] || [ ! -s "/var/lib/k0s/pki/admin.conf" ]; then
+              echo "Error: admin config '/var/lib/k0s/pki/admin.conf' not found or empty, check if the control plane is initialized on this node"
+              exit 1
+            fi
+            echo "admin.conf found, proceeding with kubeconfig generation..."
+            
+            k0s kubeconfig admin > /etc/k0s/kubeconfig.yaml
+            echo "/etc/k0s/kubeconfig.yaml generated, saving to root's .bashrc and external storage..."
+
+            if ! grep -q '^export KUBECONFIG="/etc/k0s/kubeconfig.yaml"' /root/.bashrc 2>/dev/null; then
+              echo "KUBECONFIG not found in root's .bashrc, adding it..."
+              printf '\nexport KUBECONFIG="/etc/k0s/kubeconfig.yaml"\n' >> /root/.bashrc
+            else
+              echo "KUBECONFIG found in root's .bashrc, no need to add it"
+            fi
+
+    - name: "Watch for k0s admin.conf changes"
+      files:
+        - path: /etc/systemd/system/k0s-kubeconfig.path
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            [Unit]
+            Description=Watch for k0s admin.conf
+
+            [Path]
+            PathChanged=/var/lib/k0s/pki/admin.conf
+            PathExists=/var/lib/k0s/pki/admin.conf
+
+            [Install]
+            WantedBy=multi-user.target
+    - name: "Call k0s-kubeconfig script on k0s admin.conf changes"
+      files:
+        - path: /etc/systemd/system/k0s-kubeconfig.service
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            [Unit]
+            Description=Generate k0s kubeconfig
+            After=k0scontroller.service
+
+            [Service]
+            Type=oneshot
+            RemainAfterExit=yes
+            ExecStart=/usr/local/bin/k0s-kubeconfig
+            Restart=on-failure
+            RestartSec=30s
+            StartLimitInterval=300s
+            StartLimitBurst=10
+
+            [Install]
+            WantedBy=multi-user.target
+
+    - name: "Enable k0s kubeconfig related units"
+      commands:
+        - ln -sf /etc/systemd/system/k0s-kubeconfig.path /etc/systemd/system/multi-user.target.wants/k0s-kubeconfig.path
+        - ln -sf /etc/systemd/system/k0s-kubeconfig.service /etc/systemd/system/multi-user.target.wants/k0s-kubeconfig.service
+    - name: "Add local-path-provisioner"
+      files:
+        - path: /var/lib/k0s/manifests/local-path-provisioner/local-path-storage.yaml
+          permissions: 0655
+          owner: 0
+          group: 0
+          # from https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
+          content: |
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: local-path-storage
+
+            ---
+            apiVersion: v1
+            kind: ServiceAccount
+            metadata:
+              name: local-path-provisioner-service-account
+              namespace: local-path-storage
+
+            ---
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: Role
+            metadata:
+              name: local-path-provisioner-role
+              namespace: local-path-storage
+            rules:
+              - apiGroups: [""]
+                resources: ["pods"]
+                verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+
+            ---
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRole
+            metadata:
+              name: local-path-provisioner-role
+            rules:
+              - apiGroups: [""]
+                resources: ["nodes", "persistentvolumeclaims", "configmaps", "pods", "pods/log"]
+                verbs: ["get", "list", "watch"]
+              - apiGroups: [""]
+                resources: ["persistentvolumes"]
+                verbs: ["get", "list", "watch", "create", "patch", "update", "delete"]
+              - apiGroups: [""]
+                resources: ["events"]
+                verbs: ["create", "patch"]
+              - apiGroups: ["storage.k8s.io"]
+                resources: ["storageclasses"]
+                verbs: ["get", "list", "watch"]
+
+            ---
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: RoleBinding
+            metadata:
+              name: local-path-provisioner-bind
+              namespace: local-path-storage
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: Role
+              name: local-path-provisioner-role
+            subjects:
+              - kind: ServiceAccount
+                name: local-path-provisioner-service-account
+                namespace: local-path-storage
+
+            ---
+            apiVersion: rbac.authorization.k8s.io/v1
+            kind: ClusterRoleBinding
+            metadata:
+              name: local-path-provisioner-bind
+            roleRef:
+              apiGroup: rbac.authorization.k8s.io
+              kind: ClusterRole
+              name: local-path-provisioner-role
+            subjects:
+              - kind: ServiceAccount
+                name: local-path-provisioner-service-account
+                namespace: local-path-storage
+
+            ---
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: local-path-provisioner
+              namespace: local-path-storage
+            spec:
+              replicas: 1
+              selector:
+                matchLabels:
+                  app: local-path-provisioner
+              template:
+                metadata:
+                  labels:
+                    app: local-path-provisioner
+                spec:
+                  serviceAccountName: local-path-provisioner-service-account
+                  containers:
+                    - name: local-path-provisioner
+                      image: rancher/local-path-provisioner:v0.0.32
+                      imagePullPolicy: IfNotPresent
+                      command:
+                        - local-path-provisioner
+                        - --debug
+                        - start
+                        - --config
+                        - /etc/config/config.json
+                      volumeMounts:
+                        - name: config-volume
+                          mountPath: /etc/config/
+                      env:
+                        - name: POD_NAMESPACE
+                          valueFrom:
+                            fieldRef:
+                              fieldPath: metadata.namespace
+                        - name: CONFIG_MOUNT_PATH
+                          value: /etc/config/
+                  volumes:
+                    - name: config-volume
+                      configMap:
+                        name: local-path-config
+
+            ---
+            apiVersion: storage.k8s.io/v1
+            kind: StorageClass
+            metadata:
+              name: local-path
+            provisioner: rancher.io/local-path
+            volumeBindingMode: WaitForFirstConsumer
+            reclaimPolicy: Delete
+
+            ---
+            kind: ConfigMap
+            apiVersion: v1
+            metadata:
+              name: local-path-config
+              namespace: local-path-storage
+            data:
+              config.json: |-
+                {
+                        "nodePathMap":[
+                        {
+                                "node":"DEFAULT_PATH_FOR_NON_LISTED_NODES",
+                                "paths":["/opt/local-path-provisioner"]
+                        }
+                        ]
+                }
+              setup: |-
+                #!/bin/sh
+                set -eu
+                mkdir -m 0777 -p "$VOL_DIR"
+              teardown: |-
+                #!/bin/sh
+                set -eu
+                rm -rf "$VOL_DIR"
+              helperPod.yaml: |-
+                apiVersion: v1
+                kind: Pod
+                metadata:
+                  name: helper-pod
+                spec:
+                  priorityClassName: system-node-critical
+                  tolerations:
+                    - key: node.kubernetes.io/disk-pressure
+                      operator: Exists
+                      effect: NoSchedule
+                  containers:
+                  - name: helper-pod
+                    image: busybox
+                    imagePullPolicy: IfNotPresent
+    - name: "Add LocalAI deployment"
+      files:
+        - path: /var/lib/k0s/manifests/local-ai/deployment.yaml
+          permissions: 0655
+          owner: 0
+          group: 0
+          # from https://raw.githubusercontent.com/mudler/LocalAI-examples/refs/heads/main/kubernetes/deployment.yaml
+          content: |
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: local-ai
+            ---
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: models-pvc
+              namespace: local-ai
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+              storageClassName: local-path # added so the storage gets initialized
+            ---
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: local-ai
+              namespace: local-ai
+              labels:
+                app: local-ai
+            spec:
+              selector:
+                matchLabels:
+                  app: local-ai
+              replicas: 1
+              template:
+                metadata:
+                  labels:
+                    app: local-ai
+                  name: local-ai
+                spec:
+                  containers:
+                    - args:
+                      - phi-2
+                      env:
+                      - name: DEBUG
+                        value: "true"
+                      name: local-ai
+                      image: quay.io/go-skynet/local-ai:master
+                      imagePullPolicy: IfNotPresent
+                      volumeMounts:
+                        - name: models-volume
+                          mountPath: /build/models
+                  volumes:
+                    - name: models-volume
+                      persistentVolumeClaim:
+                        claimName: models-pvc
+            ---
+            apiVersion: v1
+            kind: Service
+            metadata:
+              name: local-ai
+              namespace: local-ai
+            spec:
+              selector:
+                app: local-ai
+              type: LoadBalancer
+              ports:
+                - protocol: TCP
+                  port: 8080
+                  targetPort: 8080
