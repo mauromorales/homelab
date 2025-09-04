@@ -1,0 +1,64 @@
+name: 'Build ThurorOS image'
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'nodes/thuroros/Dockerfile'
+  pull_request:
+    paths:
+      - 'nodes/thuroros/Dockerfile'
+
+permissions:
+  contents: write
+  security-events: write
+  id-token: write
+  actions: read
+jobs:
+  thuroros-base:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          platforms: linux/arm64
+          file: nodes/thuroros/Dockerfile
+          tags: quay.io/mauromorales/thuroros:base-${{ github.sha }}
+          labels: "quay.expires-after=2d"
+          push: true
+  thuroros:
+    name: Kairos Factory
+    needs: thuroros-base
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@dockerfile.img
+    secrets:
+      registry_username: ${{ secrets.REGISTRY_USERNAME }}
+      registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+    with:
+      base_image: quay.io/mauromorales/thuroros:base-${{ github.sha }}
+      model: "generic"
+      arch: "arm64"
+      version: "auto"
+      raw: true
+      grype: true
+      registry_domain: "quay.io"
+      registry_namespace: "mauromorales"
+      registry_repository: "thuroros"
+      summary_artifacts: true
+      custom_tag_format: "$VERSION"
+      custom_artifact_format: "thuroros-$VERSION"
+      custom_job_name_format: "thuroros"
+      cloud_config: nodes/thuroros/cloud-config.yaml
+      image_labels: "quay.expires-after=2d"

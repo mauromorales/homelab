@@ -1,0 +1,65 @@
+name: 'Build KairOS image'
+
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'nodes/kairos/Dockerfile'
+  pull_request:
+    paths:
+      - 'nodes/kairos/Dockerfile'
+
+permissions:
+  contents: write
+  security-events: write
+  id-token: write
+  actions: read
+jobs:
+  kairos-base:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          platforms: linux/amd64,linux/arm64
+          file: nodes/kairos/Dockerfile
+          tags: quay.io/mauromorales/kairos:base-${{ github.sha }}
+          labels: "quay.expires-after=2d"
+          push: true
+  kairos:
+    name: Kairos Factory
+    needs: kairos-base
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
+    secrets:
+      registry_username: ${{ secrets.REGISTRY_USERNAME }}
+      registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+    with:
+      base_image: quay.io/mauromorales/kairos:base-${{ github.sha }}
+      model: "generic"
+      arch: "amd64"
+      version: "auto"
+      iso: true
+      grype: true
+      registry_domain: "quay.io"
+      registry_namespace: "mauromorales"
+      registry_repository: "kairos"
+      summary_artifacts: true
+      kubernetes_distro: "k0s"
+      kubernetes_version: "v1.33.3+k0s.0"
+      custom_tag_format: "$KAIROS_VERSION"
+      custom_artifact_format: "kairos-$KAIROS_VERSION"
+      custom_job_name_format: "kairos"
+      image_labels: "quay.expires-after=2d"
