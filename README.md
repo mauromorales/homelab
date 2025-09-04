@@ -4,8 +4,6 @@ My personal homelab.
 
 ![hegemonikon-logo](./assets/hegemonikon-logo.png)
 
----
-
 ## Why Hegemonikon?
 
 The name comes from the Stoic concept of the *hegemonikon*—the "commanding faculty" that directs thought and action.  
@@ -15,23 +13,19 @@ This lab is my personal sandbox for exploring OS design, Kubernetes architecture
 - **Simplicity over complexity:** No unnecessary moving parts.
 - **Learning by doing:** This is as much about the process as the result.
 
----
-
 ## Hardware
 
-| Name | Device | Role in Lab | CPU | GPU | Memory | Storage |
-| ---- | ------ | ----------- | --- | --- | ------ | ------- |
-| [Protos](./nodes/protos.yaml) | HP ProDesk 600 G4 Mini | Control Plane & Worker | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
-
----
+| Device | Role in Lab | CPU | GPU | Memory | Storage |
+| ------ | ----------- | --- | --- | ------ | ------- |
+| HP ProDesk 600 G4 Mini | Control Plane & Worker | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
+| Mac Mini | iCloud Supporing Services | M2 | M2 | 8G | 256 GB SSD |
+| Raspberry Pi 4 | Doorbell relay | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
 
 ## Platform Infrastructure
 
 Still in its early stages—so far I’ve locked in the **host OS**, **Kubernetes distro**, and **one supporting service**. Expect this to evolve as I learn and expand the lab.
 
 You can read more about my choices in [Why I Chose This Stack for My K8s Cluster](https://www.mauromorales.com/2025/08/11/why-i-chose-this-stack-for-my-k8s-cluster/).
-
----
 
 ### Host OS
 
@@ -52,14 +46,19 @@ Kairos Factory produces two artifacts per build:
 - **Container images** (for upgrades)  
 - **Bootable media** (ISO or RAW, depending on the node)
 
-| Name | Role |
-| ---- | ---- |
-| ProtOS | Control Plane & Worker |
-| Kairos | Test node (no fixed role) |
+| Name | Role | Status |
+| ---- | ---- | ------ |
+| [ProtOS](./nodes/protos/README.md) | K8s Homelab | ️️✅ 🏃‍ |
+| [KairOS](./nodes/kairos/README.md) | Kairos with debugging tools | ✅ |
+| [NoOS](./nodes/noos/README.md) | Local-AI | ✅ 🚀 |
+| [ThurorOS](./nodes/thuroros/README.md) | Doorbell | 🔄 |
+
+- ✅ Ready to be used on demand
+- 🏃‍♂️ Running 
+- 🚀 Ready to be deployed
+- 🔄 In development
 
 More on this topic: [What Are Special-Purpose Operating Systems in the Cloud-Native World?](https://www.mauromorales.com/2025/04/16/what-are-special-purpose-operating-systems-in-the-cloud-native-world/)
-
----
 
 ### Kubernetes Distribution & Container Runtime
 
@@ -71,31 +70,12 @@ I like the clean separation of control-plane components and the way their tokeni
 
 For now, I stick to the defaults that come with K0s to keep the learning curve smooth.
 
----
-
 ### Supporting Services
 
 At the moment, only one:
 
 - **[mowa](https://github.com/mauromorales/mowa)** — sends notifications through Apple Messages and provides simple shared storage outside the cluster.  
   Runs on a Mac Mini M2 (8 GB RAM).
-
----
-
-## Current Status
-
-- Pipeline builds images successfully.
-- Protos is running but still being tested.
-- mowa service is operational with my own iCloud account (needs migration to its own account so notifications don’t come as myself).
-
----
-
-## Next Steps
-
-- Migrate the doorbell single-node cluster into the main cluster (ideally via K0smotron).
-- Extend the cluster with another node to enable canary upgrades.
-
----
 
 ## Related Writings
 
