@@ -103,6 +103,9 @@ stages:
     - name: "Add local-path-provisioner"
       files:
         - path: /var/lib/k0s/manifests/local-path-provisioner/local-path-storage.yaml
+          permissions: 0655
+          owner: 0
+          group: 0
           # from https://raw.githubusercontent.com/rancher/local-path-provisioner/master/deploy/local-path-storage.yaml
           content: |
             apiVersion: v1
@@ -269,6 +272,9 @@ stages:
     - name: "Add LocalAI deployment"
       files:
         - path: /var/lib/k0s/manifests/local-ai/deployment.yaml
+          permissions: 0655
+          owner: 0
+          group: 0
           # from https://raw.githubusercontent.com/mudler/LocalAI-examples/refs/heads/main/kubernetes/deployment.yaml
           content: |
             apiVersion: v1
@@ -287,6 +293,7 @@ stages:
               resources:
                 requests:
                   storage: 1Gi
+              storageClassName: local-path # added so the storage gets initialized
             ---
             apiVersion: apps/v1
             kind: Deployment
