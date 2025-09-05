@@ -103,7 +103,7 @@ jobs:
   kairos:
     name: Kairos Factory
     needs: kairos-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.7
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -127,7 +127,7 @@ jobs:
   protos:
     name: Kairos Factory
     needs: protos-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.7
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -152,7 +152,7 @@ jobs:
   thuroros:
     name: Kairos Factory
     needs: thuroros-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.7
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -175,7 +175,7 @@ jobs:
   noos:
     name: Kairos Factory
     needs: noos-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.7
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
