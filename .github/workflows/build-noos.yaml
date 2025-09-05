@@ -42,7 +42,7 @@ jobs:
   noos:
     name: Kairos Factory
     needs: noos-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.7
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
