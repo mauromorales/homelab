@@ -123,7 +123,7 @@ jobs:
       custom_tag_format: "$KAIROS_VERSION"
       custom_artifact_format: "kairos-$KAIROS_VERSION"
       custom_job_name_format: "kairos"
-      release: true
+      # release: true
   protos:
     name: Kairos Factory
     needs: protos-base
@@ -148,7 +148,7 @@ jobs:
       custom_artifact_format: "protos-$VERSION"
       custom_job_name_format: "protos"
       cloud_config: nodes/protos/cloud-config.yaml
-      release: true
+      # release: true
   thuroros:
     name: Kairos Factory
     needs: thuroros-base
@@ -171,7 +171,7 @@ jobs:
       custom_artifact_format: "thuroros-$VERSION"
       custom_job_name_format: "thuroros"
       cloud_config: nodes/thuroros/cloud-config.yaml
-      release: true
+      # release: true
   noos:
     name: Kairos Factory
     needs: noos-base
@@ -193,6 +193,6 @@ jobs:
       kubernetes_distro: "k0s"
       kubernetes_version: "v1.33.3+k0s.0"
       custom_tag_format: "$VERSION"
-      custom_artifact_format: "noos-$KAIROS_VERSION"
+      custom_artifact_format: "noos-$VERSION"
       custom_job_name_format: "noos"
-      release: true
+      # release: true
