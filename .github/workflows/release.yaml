@@ -103,7 +103,7 @@ jobs:
   kairos:
     name: Kairos Factory
     needs: kairos-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@gh-release
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -123,11 +123,11 @@ jobs:
       custom_tag_format: "$KAIROS_VERSION"
       custom_artifact_format: "kairos-$KAIROS_VERSION"
       custom_job_name_format: "kairos"
-      # release: true
+      release: true
   protos:
     name: Kairos Factory
     needs: protos-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@gh-release
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -148,11 +148,11 @@ jobs:
       custom_artifact_format: "protos-$VERSION"
       custom_job_name_format: "protos"
       cloud_config: nodes/protos/cloud-config.yaml
-      # release: true
+      release: true
   thuroros:
     name: Kairos Factory
     needs: thuroros-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@gh-release
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -171,11 +171,11 @@ jobs:
       custom_artifact_format: "thuroros-$VERSION"
       custom_job_name_format: "thuroros"
       cloud_config: nodes/thuroros/cloud-config.yaml
-      # release: true
+      release: true
   noos:
     name: Kairos Factory
     needs: noos-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@v0.0.8
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@gh-release
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -195,4 +195,4 @@ jobs:
       custom_tag_format: "$VERSION"
       custom_artifact_format: "noos-$VERSION"
       custom_job_name_format: "noos"
-      # release: true
+      release: true
