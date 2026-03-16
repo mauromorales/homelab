@@ -53,6 +53,7 @@ jobs:
       version: "auto"
       iso: true
       grype: true
+      security_scan_mode: "report-only"
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
       registry_repository: "kairos"

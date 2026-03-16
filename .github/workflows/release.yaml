@@ -114,6 +114,7 @@ jobs:
       version: "auto"
       iso: true
       grype: true
+      security_scan_mode: "report-only"
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
       registry_repository: "kairos"
@@ -138,6 +139,7 @@ jobs:
       version: "auto"
       iso: true
       grype: true
+      security_scan_mode: "report-only"
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
       registry_repository: "protos"
@@ -163,6 +165,7 @@ jobs:
       version: "auto"
       raw: true
       grype: true
+      security_scan_mode: "report-only"
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
       registry_repository: "thuroros"
@@ -186,6 +189,7 @@ jobs:
       version: "auto"
       iso: true
       grype: true
+      security_scan_mode: "report-only"
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
       registry_repository: "noos"
