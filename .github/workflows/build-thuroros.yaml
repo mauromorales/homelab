@@ -59,7 +59,7 @@ jobs:
       registry_repository: "thuroros"
       summary_artifacts: true
       custom_tag_format: "$VERSION"
-      custom_artifact_format: "thuroros-$VERSION"
+      custom_artifact_format: "thuroros-$VERSION-$ARCH-$COMMIT_SHA"
       custom_job_name_format: "thuroros"
       cloud_config: nodes/thuroros/cloud-config.yaml
       image_labels: "quay.expires-after=2d"
