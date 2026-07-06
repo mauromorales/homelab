@@ -5,7 +5,7 @@ hostname: "thuroros"
 install:
   auto: true
   reboot: true
-  device: /dev/vda
+  device: auto
 
 users:
   - name: "mauro"
@@ -15,7 +15,7 @@ users:
 
 stages:
   initramfs:
-    - name: "Generate k0s kubeconfig script"
+    - name: "Create doorbell script"
       files:
         - path: /usr/local/bin/doorbell
           permissions: 0755
@@ -39,11 +39,11 @@ stages:
                 """Send a doorbell message to mowa which sends it to my phone."""
                 
                 # API endpoint
-                url = "http://epictetus.local:8080/api/messages"
+                url = "http://polaris.local:8080/api/messages"
                 
                 # JSON payload
                 payload = {
-                    "to": ["mauro"],
+                    "to": ["admin"],
                     "message": message
                 }
                 
@@ -55,15 +55,25 @@ stages:
                 try:
                     # Send POST request
                     response = requests.post(url, json=payload, headers=headers)
-                    
-                    # Check if request was successful
-                    if response.status_code == 200:
-                        print(f"✅ Doorbell message sent successfully!")
-                    else:
+
+                    # A 200 only means mowa accepted the request; delivery status
+                    # is reported per-recipient in the response body.
+                    if response.status_code != 200:
                         print(f"❌ Failed to send doorbell message. Status code: {response.status_code}")
-                        
+                        return
+
+                    results = response.json().get("results", [])
+                    failed = [r for r in results if not r.get("success")]
+                    if not results:
+                        print(f"❌ No recipients in mowa response: {response.text}")
+                    elif failed:
+                        for r in failed:
+                            print(f"❌ Delivery failed for {r.get('recipient')}: {r.get('error', 'unknown error')}")
+                    else:
+                        print(f"✅ Doorbell message sent successfully!")
+
                 except requests.exceptions.ConnectionError:
-                    print("❌ Connection error: Could not connect to epictetus.local")
+                    print("❌ Connection error: Could not connect to polaris.local")
                 except requests.exceptions.RequestException as e:
                     print(f"❌ Request error: {e}")
                 except Exception as e:
