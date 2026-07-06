@@ -50,7 +50,7 @@ jobs:
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
     with:
       base_image: quay.io/mauromorales/thuroros:base-${{ github.sha }}
-      model: "generic"
+      model: "rpi4"
       arch: "arm64"
       version: "auto"
       raw: true
