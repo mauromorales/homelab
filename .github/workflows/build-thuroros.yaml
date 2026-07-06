@@ -1,16 +1,19 @@
 name: 'Build ThurorOS image'
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - 'main'
     paths:
       - 'nodes/thuroros/Dockerfile'
       - 'nodes/thuroros/cloud-config.yaml'
+      - '.github/workflows/build-thuroros.yaml'
   pull_request:
     paths:
       - 'nodes/thuroros/Dockerfile'
       - 'nodes/thuroros/cloud-config.yaml'
+      - '.github/workflows/build-thuroros.yaml'
 
 permissions:
   contents: write
