@@ -2,11 +2,6 @@
 
 hostname: "thuroros"
 
-install:
-  auto: true
-  reboot: true
-  device: auto
-
 users:
   - name: "mauro"
     groups: ["admin"]
@@ -33,7 +28,7 @@ stages:
             # GPIO Setup
             GPIO_PIN = 23
             h = GPIO.gpiochip_open(0)
-            GPIO.gpio_claim_input(h, GPIO_PIN, GPIO.SET_PULL_UP)
+            GPIO.gpio_claim_input(h, GPIO_PIN, GPIO.SET_BIAS_PULL_UP)
 
             def notify(message):
                 """Send a doorbell message to mowa which sends it to my phone."""
@@ -103,10 +98,17 @@ stages:
 
             [Service]
             Type=simple
+            # lgpio creates .lgd-nfy* notification files in the working directory;
+            # Kairos root is read-only, so use a writable runtime dir.
+            RuntimeDirectory=doorbell
+            WorkingDirectory=/run/doorbell
+            Environment=PYTHONUNBUFFERED=1
             ExecStart=/usr/local/bin/doorbell
             Restart=always
             RestartSec=2
             SyslogIdentifier=doorbell
+            StandardOutput=journal
+            StandardError=journal
 
             [Install]
             WantedBy=multi-user.target

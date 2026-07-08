@@ -159,8 +159,9 @@ jobs:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
     with:
+      dockerfile_path: nodes/thuroros/kairos.Dockerfile
       base_image: quay.io/mauromorales/thuroros:base-${{ github.sha }}
-      model: "generic"
+      model: "rpi4"
       arch: "arm64"
       version: "auto"
       raw: true

@@ -7,11 +7,13 @@ on:
       - 'main'
     paths:
       - 'nodes/thuroros/Dockerfile'
+      - 'nodes/thuroros/kairos.Dockerfile'
       - 'nodes/thuroros/cloud-config.yaml'
       - '.github/workflows/build-thuroros.yaml'
   pull_request:
     paths:
       - 'nodes/thuroros/Dockerfile'
+      - 'nodes/thuroros/kairos.Dockerfile'
       - 'nodes/thuroros/cloud-config.yaml'
       - '.github/workflows/build-thuroros.yaml'
 
@@ -52,6 +54,7 @@ jobs:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
     with:
+      dockerfile_path: nodes/thuroros/kairos.Dockerfile
       base_image: quay.io/mauromorales/thuroros:base-${{ github.sha }}
       model: "rpi4"
       arch: "arm64"
