@@ -22,6 +22,7 @@ stages:
             import time
             import requests
             import json
+            import os
             from datetime import datetime
             import pytz
 
@@ -30,7 +31,27 @@ stages:
             h = GPIO.gpiochip_open(0)
             GPIO.gpio_claim_input(h, GPIO_PIN, GPIO.SET_BIAS_PULL_UP)
 
-            def notify(message):
+            # Runtime config, shared with the doorbell-web config UI. Lives on a Kairos
+            # persistent path so it survives reboots and upgrades.
+            CONFIG_PATH = "/usr/local/doorbell/config.json"
+            DEFAULT_TO = "admin"
+            DEFAULT_MESSAGE = "🔔 Someone is at the door 🚪"
+            ALLOWED_RECIPIENTS = ["admin", "family"]
+
+            def load_config():
+                """Read the current recipient/message, falling back to defaults."""
+                try:
+                    with open(CONFIG_PATH) as f:
+                        cfg = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError, OSError):
+                    cfg = {}
+                to = cfg.get("to", DEFAULT_TO)
+                if to not in ALLOWED_RECIPIENTS:
+                    to = DEFAULT_TO
+                message = cfg.get("message") or DEFAULT_MESSAGE
+                return to, message
+
+            def notify(to, message):
                 """Send a doorbell message to mowa which sends it to my phone."""
                 
                 # API endpoint
@@ -38,7 +59,7 @@ stages:
                 
                 # JSON payload
                 payload = {
-                    "to": ["admin"],
+                    "to": [to],
                     "message": message
                 }
                 
@@ -65,7 +86,7 @@ stages:
                         for r in failed:
                             print(f"❌ Delivery failed for {r.get('recipient')}: {r.get('error', 'unknown error')}")
                     else:
-                        print(f"✅ Doorbell message sent successfully!")
+                        print(f"✅ Doorbell message sent successfully to '{to}'!")
 
                 except requests.exceptions.ConnectionError:
                     print("❌ Connection error: Could not connect to polaris.local")
@@ -77,13 +98,147 @@ stages:
             print("🚀 Doorbell monitor started...")
             while True:
                 if GPIO.gpio_read(h, GPIO_PIN) == 0:  # Button pressed
+                    to, message = load_config()
                     brussels_tz = pytz.timezone('Europe/Brussels')
                     timestamp = datetime.now(brussels_tz).strftime("%Y-%m-%d %H:%M:%S")
-                    message = f"🔔 Someone is at the door 🚪"
-                    print(f"[{timestamp}] {message}")
-                    notify(message)
+                    print(f"[{timestamp}] {message} -> {to}")
+                    notify(to, message)
                     time.sleep(2)  # Avoid spamming messages
                 time.sleep(0.1)
+    - name: "Create doorbell config web UI script"
+      files:
+        - path: /usr/local/bin/doorbell-web
+          permissions: 0755
+          owner: 0
+          group: 0
+          content: |
+            #!/usr/bin/env python3
+            """Tiny config UI for the doorbell, served at http://thuroros.local:8080/doorbell
+
+            Lets you pick who gets notified (admin/family) and change the message text
+            without redeploying. Writes the same config file the doorbell service reads.
+            """
+            import json
+            import os
+            import html
+            from http.server import BaseHTTPRequestHandler, HTTPServer
+            from urllib.parse import parse_qs, urlparse
+
+            CONFIG_PATH = "/usr/local/doorbell/config.json"
+            DEFAULT_TO = "admin"
+            DEFAULT_MESSAGE = "🔔 Someone is at the door 🚪"
+            ALLOWED_RECIPIENTS = ["admin", "family"]
+            PORT = 8080
+
+            def load_config():
+                try:
+                    with open(CONFIG_PATH) as f:
+                        cfg = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError, OSError):
+                    cfg = {}
+                to = cfg.get("to", DEFAULT_TO)
+                if to not in ALLOWED_RECIPIENTS:
+                    to = DEFAULT_TO
+                message = cfg.get("message") or DEFAULT_MESSAGE
+                return {"to": to, "message": message}
+
+            def save_config(cfg):
+                os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+                tmp = CONFIG_PATH + ".tmp"
+                with open(tmp, "w") as f:
+                    json.dump(cfg, f, ensure_ascii=False)
+                os.replace(tmp, CONFIG_PATH)  # atomic
+
+            def render(cfg, saved=False):
+                options = "".join(
+                    f'<option value="{r}"{" selected" if r == cfg["to"] else ""}>{r}</option>'
+                    for r in ALLOWED_RECIPIENTS
+                )
+                banner = '<p class="ok">✅ Saved</p>' if saved else ""
+                return f"""<!DOCTYPE html>
+            <html lang="en">
+            <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Doorbell</title>
+            <style>
+              body {{ font-family: system-ui, sans-serif; max-width: 30rem; margin: 2rem auto; padding: 0 1rem; }}
+              label {{ display: block; margin-top: 1.2rem; font-weight: 600; }}
+              select, input[type=text] {{ width: 100%; padding: .55rem; font-size: 1rem; box-sizing: border-box; margin-top: .3rem; }}
+              button {{ margin-top: 1.5rem; padding: .6rem 1.2rem; font-size: 1rem; cursor: pointer; }}
+              .ok {{ color: #157347; font-weight: 600; }}
+              .hint {{ color: #666; font-size: .85rem; margin-top: .3rem; }}
+              .secondary {{ background: none; border: none; color: #666; text-decoration: underline; padding: 0; margin-top: 1rem; font-size: .9rem; }}
+            </style>
+            </head>
+            <body>
+            <h1>🔔 Doorbell</h1>
+            {banner}
+            <form method="post" action="/doorbell">
+              <label for="to">Send notifications to</label>
+              <select id="to" name="to">{options}</select>
+
+              <label for="message">Message</label>
+              <input type="text" id="message" name="message" value="{html.escape(cfg["message"])}">
+              <p class="hint">Default: {html.escape(DEFAULT_MESSAGE)}</p>
+
+              <button type="submit">Save</button>
+            </form>
+            <form method="post" action="/doorbell">
+              <input type="hidden" name="reset" value="1">
+              <button type="submit" class="secondary">Reset message to default</button>
+            </form>
+            </body>
+            </html>"""
+
+            class Handler(BaseHTTPRequestHandler):
+                def _html(self, body, status=200):
+                    data = body.encode("utf-8")
+                    self.send_response(status)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+
+                def do_GET(self):
+                    parsed = urlparse(self.path)
+                    if parsed.path.rstrip("/") in ("", "/doorbell"):
+                        saved = parse_qs(parsed.query).get("saved", ["0"])[0] == "1"
+                        self._html(render(load_config(), saved))
+                    else:
+                        self.send_error(404)
+
+                def do_POST(self):
+                    if urlparse(self.path).path.rstrip("/") != "/doorbell":
+                        self.send_error(404)
+                        return
+                    length = int(self.headers.get("Content-Length", 0))
+                    form = parse_qs(self.rfile.read(length).decode("utf-8"), keep_blank_values=True)
+                    cfg = load_config()
+                    if form.get("reset", ["0"])[0] == "1":
+                        cfg["message"] = DEFAULT_MESSAGE
+                    else:
+                        to = form.get("to", [cfg["to"]])[0]
+                        if to in ALLOWED_RECIPIENTS:
+                            cfg["to"] = to
+                        message = form.get("message", [cfg["message"]])[0].strip()
+                        cfg["message"] = message or DEFAULT_MESSAGE
+                    save_config(cfg)
+                    # Post/Redirect/Get so a refresh doesn't resubmit
+                    self.send_response(303)
+                    self.send_header("Location", "/doorbell?saved=1")
+                    self.end_headers()
+
+                def log_message(self, fmt, *args):
+                    print("%s - %s" % (self.address_string(), fmt % args))
+
+            def main():
+                server = HTTPServer(("0.0.0.0", PORT), Handler)
+                print(f"🌐 Doorbell config UI listening on :{PORT}/doorbell")
+                server.serve_forever()
+
+            if __name__ == "__main__":
+                main()
     - name: "Add doorbell service"
       files:
         - path: /etc/systemd/system/doorbell.service
@@ -112,6 +267,31 @@ stages:
 
             [Install]
             WantedBy=multi-user.target
-    - name: "Enable doorbell service"
+    - name: "Add doorbell config web UI service"
+      files:
+        - path: /etc/systemd/system/doorbell-web.service
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            [Unit]
+            Description=Doorbell config web UI
+            Wants=network-online.target
+            After=network-online.target
+
+            [Service]
+            Type=simple
+            Environment=PYTHONUNBUFFERED=1
+            ExecStart=/usr/local/bin/doorbell-web
+            Restart=always
+            RestartSec=2
+            SyslogIdentifier=doorbell-web
+            StandardOutput=journal
+            StandardError=journal
+
+            [Install]
+            WantedBy=multi-user.target
+    - name: "Enable doorbell services"
       commands:
         - ln -sf /etc/systemd/system/doorbell.service /etc/systemd/system/multi-user.target.wants/doorbell.service
+        - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
