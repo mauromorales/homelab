@@ -69,8 +69,11 @@ stages:
                 }
                 
                 try:
-                    # Send POST request
-                    response = requests.post(url, json=payload, headers=headers)
+                    # Send POST request. mowa relays synchronously via Messages,
+                    # whose AppleScript bridge can occasionally hang (default
+                    # AppleEvent timeout is ~120s). Bound the wait so a wedged
+                    # Messages can't freeze the doorbell: (connect, read) seconds.
+                    response = requests.post(url, json=payload, headers=headers, timeout=(3.05, 10))
 
                     # A 200 only means mowa accepted the request; delivery status
                     # is reported per-recipient in the response body.
@@ -90,6 +93,8 @@ stages:
 
                 except requests.exceptions.ConnectionError:
                     print("❌ Connection error: Could not connect to polaris.local")
+                except requests.exceptions.Timeout:
+                    print("⏱️ Timeout: polaris.local did not respond in time (Messages may be stuck); giving up on this press")
                 except requests.exceptions.RequestException as e:
                     print(f"❌ Request error: {e}")
                 except Exception as e:
