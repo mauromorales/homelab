@@ -7,7 +7,7 @@ it is published as an OCI artifact in quay instead:
 - `quay.io/mauromorales/thuroros:__TAG__-img` — the raw disk image (flash this)
 - `quay.io/mauromorales/thuroros:__TAG__` — the container image (for `kairos upgrade`)
 
-### 1. Extract the raw image (Docker only, no luet)
+### 1. Extract the raw image with Docker
 
 The `-img` tag is a `scratch` image that just carries the raw file under
 `/artifacts`, so you can pull it out with plain Docker:
