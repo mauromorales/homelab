@@ -48,15 +48,18 @@ Kairos Factory produces two artifacts per build:
 
 | Name | Role | Status |
 | ---- | ---- | ------ |
-| [ProtOS](./nodes/protos/README.md) | K8s Homelab | ️️✅ 🏃‍ |
-| [KairOS](./nodes/kairos/README.md) | Kairos with debugging tools | ✅ |
-| [NoOS](./nodes/noos/README.md) | Local-AI | ✅ 🚀 |
-| [ThurorOS](./nodes/thuroros/README.md) | Doorbell | 🔄 |
+| [ThurorOS](./nodes/thuroros/README.md) | Doorbell | ✅ 🏃 |
+| [ProtOS](./nodes/protos/README.md) | K8s Homelab | ⏸️ |
+| [KairOS](./nodes/kairos/README.md) | Kairos with debugging tools | ⏸️ |
+| [NoOS](./nodes/noos/README.md) | Local-AI | ⏸️ |
 
 - ✅ Ready to be used on demand
 - 🏃‍♂️ Running 
 - 🚀 Ready to be deployed
 - 🔄 In development
+- ⏸️ On hold — excluded from the release pipeline pending testing
+
+Only **ThurorOS** is currently built by the [release pipeline](./.github/workflows/release.yaml); the other nodes are on hold until they have been tested.
 
 More on this topic: [What Are Special-Purpose Operating Systems in the Cloud-Native World?](https://www.mauromorales.com/2025/04/16/what-are-special-purpose-operating-systems-in-the-cloud-native-world/)
 

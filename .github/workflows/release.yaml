@@ -10,8 +10,12 @@ permissions:
   security-events: write
   id-token: write
   actions: read
+# NOTE: only thuroros is currently released. kairos, protos and noos are on
+# hold (if: false) until they have been tested; remove the `if: false` line
+# from a job to bring it back into the release. See the status table in README.
 jobs:
   kairos-base:
+    if: false  # on hold — re-enable once tested
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -34,6 +38,7 @@ jobs:
           tags: quay.io/mauromorales/kairos:base-${{ github.sha }}
           push: true
   protos-base:
+    if: false  # on hold — re-enable once tested
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -78,6 +83,7 @@ jobs:
           tags: quay.io/mauromorales/thuroros:base-${{ github.sha }}
           push: true
   noos-base:
+    if: false  # on hold — re-enable once tested
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -101,6 +107,7 @@ jobs:
           push: true
 
   kairos:
+    if: false  # on hold — re-enable once tested
     name: Kairos Factory
     needs: kairos-base
     uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@gh-release
@@ -126,6 +133,7 @@ jobs:
       custom_job_name_format: "kairos"
       release: false
   protos:
+    if: false  # on hold — re-enable once tested
     name: Kairos Factory
     needs: protos-base
     uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@gh-release
@@ -177,6 +185,7 @@ jobs:
       cloud_config: nodes/thuroros/cloud-config.yaml
       release: true
   noos:
+    if: false  # on hold — re-enable once tested
     name: Kairos Factory
     needs: noos-base
     uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@gh-release
