@@ -61,8 +61,6 @@ Kairos Factory produces two artifacts per build:
 
 Only **ThurorOS** is currently built by the [release pipeline](./.github/workflows/release.yaml); the other nodes are on hold until they have been tested.
 
-See [node architecture](./nodes/architecture.md) for how the nodes work together.
-
 More on this topic: [What Are Special-Purpose Operating Systems in the Cloud-Native World?](https://www.mauromorales.com/2025/04/16/what-are-special-purpose-operating-systems-in-the-cloud-native-world/)
 
 ### Kubernetes Distribution & Container Runtime
