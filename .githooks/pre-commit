@@ -1,0 +1,12 @@
+#!/bin/sh
+# Blocks commits directly on protected branches (see CLAUDE.md: "never commit to main directly").
+protected_branches="main master"
+current_branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+for branch in $protected_branches; do
+  if [ "$current_branch" = "$branch" ]; then
+    echo "error: direct commits to '$branch' are not allowed." >&2
+    echo "       create a branch first: git checkout -b <branch-name>" >&2
+    exit 1
+  fi
+done
