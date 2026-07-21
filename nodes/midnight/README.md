@@ -85,8 +85,17 @@ wakeonlan <mac-address>
 sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 ```
 
-- [ ] Capture `efibootmgr` output here (boot entry IDs, especially the PXE entry, for the BootNext self-rebuild flow):
+- [x] `efibootmgr` output (captured 2026-07-21, on interim Fedora). The PXE
+  entry for the BootNext self-rebuild flow is **Boot0004** — i.e.
+  `efibootmgr --bootnext 0004` then reboot. The NIC MAC in that entry is
+  redacted here to match the identity table (kept in private notes).
 
 ```
-(paste output)
+BootCurrent: 0002
+Timeout: 1 seconds
+BootOrder: 0002,0005,0004,0001
+Boot0001* UEFI: Built-in EFI Shell	VenMedia(5023b95c-db26-429b-a648-bd47664c8012)0000424f
+Boot0002* Fedora	HD(1,GPT,a3642207-8e20-47c0-9cdd-ea0eacc4b7bf,0x800,0x12c000)/\EFI\FEDORA\SHIMX64.EFI
+Boot0004* UEFI: PXE IPv4 Realtek PCIe 2.5GBE Family Controller	PciRoot(0x0)/Pci(0x1,0x2)/Pci(0x0,0x0)/MAC(<redacted>,0)/IPv4(0.0.0.0,0,DHCP,0.0.0.0,0.0.0.0,0.0.0.0)0000424f
+Boot0005* Fedora	HD(1,GPT,a3642207-8e20-47c0-9cdd-ea0eacc4b7bf,0x800,0x12c000)/\EFI\FEDORA\SHIM.EFI0000424f
 ```
