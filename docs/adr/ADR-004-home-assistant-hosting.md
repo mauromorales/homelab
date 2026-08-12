@@ -76,9 +76,52 @@ infrastructure and a lab one intentionally breaks are opposing requirements.
 
 **Networking friction (future).** Not currently blocking, because ADR-003 chose
 WiFi/MQTT, so the RFX is merely a TCP endpoint and USB passthrough is a non-issue.
-But future integrations depending on mDNS and multicast (ESPHome, HomeKit bridge,
-Chromecast) become awkward under Kubernetes, typically resolved with
-`hostNetwork: true`, at which point the pod is a VM in a trenchcoat.
+Future integrations depending on mDNS and multicast (ESPHome, HomeKit bridge,
+Chromecast) are more awkward under Kubernetes, though see the prior art below:
+this objection turns out to be the weakest of the four.
+
+### Prior art reviewed
+
+Four community implementations were examined before settling this, because the
+question deserves evidence rather than assertion:
+
+- [pajikos/home-assistant-helm-chart](https://github.com/pajikos/home-assistant-helm-chart), the most popular and most actively maintained
+- [mysticrenji/home-assistant-on-kubernetes](https://github.com/mysticrenji/home-assistant-on-kubernetes)
+- [swrm.io, Home Assistant on Kubernetes](https://swrm.io/posts/homeassistant_kubernetes/)
+- [jaygould.co.uk, Setting up Home Assistant on k3s](https://jaygould.co.uk/2024-01-01-setting-up-home-assistant-kubernetes-k3s/)
+
+**The tooling is better than a first pass suggests, and two objections weaken.**
+
+The pajikos chart defaults to `controller.type: StatefulSet`, which is the correct
+primitive for a stateful singleton, and supports `podReplacementPolicy: Always` for
+faster replacement on node failure. It defaults to `hostNetwork: false` and documents
+USB dongle passthrough as a `CharDevice` hostPath. swrm.io goes further on discovery,
+using Multus CNI to attach the pod directly to the VLAN carrying the multicast
+traffic, which is cleaner than the `hostNetwork: true` that the mysticrenji chart
+defaults to. So the networking objection largely dissolves, and it was already close
+to moot here given ADR-003 put the RF gateway on MQTT over WiFi rather than USB.
+
+**The two objections that decide this do not move.**
+
+*No add-on store.* All four run HA Container; none retains the Supervisor. The
+pajikos chart offers exactly one add-on, code-server. The mysticrenji chart
+demonstrates the cost directly: it ships its own Mosquitto and Z-Wave JS deployments
+because there is nothing to install them from. Two of the written accounts name this
+as the main drawback, one calling it "the biggest drawback". This is the concrete win
+of the Pi route, since one-click Mosquitto is what the RFX needs on the far side.
+
+*Still a singleton on ReadWriteOnce storage.* Every implementation is
+single-replica on an RWO volume, and not one moves the recorder off SQLite onto
+Postgres. A StatefulSet makes hosting a pet correct rather than unnecessary, which is
+the narrow lesson this ADR already identified.
+
+Nothing in any of them touches the availability coupling, because that is a property
+of a single control plane that gets deliberately perturbed, not something a chart
+can fix.
+
+**Revisit if** the cluster becomes multi-node and stable, and HA is moved to a
+Postgres recorder. At that point the pajikos chart is the starting point, not a
+from-scratch build.
 
 ### Beelink SER5, rejected
 

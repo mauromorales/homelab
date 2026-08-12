@@ -19,7 +19,9 @@ This lab is my personal sandbox for exploring OS design, Kubernetes architecture
 | ------ | ----------- | --- | --- | ------ | ------- |
 | HP ProDesk 600 G4 Mini | Control Plane & Worker | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
 | Mac Mini | iCloud Supporing Services | M2 | M2 | 8G | 256 GB SSD |
-| Raspberry Pi 4 | Doorbell relay | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
+| Raspberry Pi 4 | Doorbell relay (`thuroros`) | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
+| Raspberry Pi 4 | Home Assistant host (see ADR-004) | ARM Cortex-A72 | Whatever comes in the Pi | 8G | USB SSD |
+| Raspberry Pi 5 | Spare | ARM Cortex-A76 | Whatever comes in the Pi | TBC | TBC |
 
 ## Platform Infrastructure
 
