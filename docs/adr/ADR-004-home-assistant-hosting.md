@@ -82,13 +82,14 @@ this objection turns out to be the weakest of the four.
 
 ### Prior art reviewed
 
-Four community implementations were examined before settling this, because the
+Five community implementations were examined before settling this, because the
 question deserves evidence rather than assertion:
 
 - [pajikos/home-assistant-helm-chart](https://github.com/pajikos/home-assistant-helm-chart), the most popular and most actively maintained
 - [mysticrenji/home-assistant-on-kubernetes](https://github.com/mysticrenji/home-assistant-on-kubernetes)
 - [swrm.io, Home Assistant on Kubernetes](https://swrm.io/posts/homeassistant_kubernetes/)
 - [jaygould.co.uk, Setting up Home Assistant on k3s](https://jaygould.co.uk/2024-01-01-setting-up-home-assistant-kubernetes-k3s/)
+- [blog.quadmeup.com, How to run Home Assistant in Kubernetes](https://blog.quadmeup.com/2025/04/07/how-to-run-home-assistant-in-kubernetes/)
 
 **The tooling is better than a first pass suggests, and two objections weaken.**
 
@@ -110,10 +111,15 @@ because there is nothing to install them from. Two of the written accounts name 
 as the main drawback, one calling it "the biggest drawback". This is the concrete win
 of the Pi route, since one-click Mosquitto is what the RFX needs on the far side.
 
-*Still a singleton on ReadWriteOnce storage.* Every implementation is
-single-replica on an RWO volume, and not one moves the recorder off SQLite onto
-Postgres. A StatefulSet makes hosting a pet correct rather than unnecessary, which is
-the narrow lesson this ADR already identified.
+*Still a singleton.* Every implementation is single-replica, and not one moves the
+recorder off SQLite onto Postgres. Storage is ReadWriteOnce in all but quadmeup, who
+uses CephFS ReadWriteMany, which removes the volume pinning without removing the
+singleton. Where real hardware is involved the pod gets pinned anyway: quadmeup pins
+by node label for the Zigbee dongle, so the scheduling freedom is spent either way.
+A StatefulSet makes hosting a pet correct rather than unnecessary, which is the
+narrow lesson this ADR already identified. The upstream position is unchanged, as
+quadmeup puts it: "officially, Home Assistant does not support running on
+Kubernetes".
 
 Nothing in any of them touches the availability coupling, because that is a property
 of a single control plane that gets deliberately perturbed, not something a chart
