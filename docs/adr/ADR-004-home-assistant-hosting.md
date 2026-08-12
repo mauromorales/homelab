@@ -82,7 +82,7 @@ this objection turns out to be the weakest of the four.
 
 ### Prior art reviewed
 
-Six community implementations were examined before settling this, because the
+Seven community implementations were examined before settling this, because the
 question deserves evidence rather than assertion:
 
 - [pajikos/home-assistant-helm-chart](https://github.com/pajikos/home-assistant-helm-chart), the most popular and most actively maintained
@@ -91,6 +91,7 @@ question deserves evidence rather than assertion:
 - [jaygould.co.uk, Setting up Home Assistant on k3s](https://jaygould.co.uk/2024-01-01-setting-up-home-assistant-kubernetes-k3s/)
 - [blog.quadmeup.com, How to run Home Assistant in Kubernetes](https://blog.quadmeup.com/2025/04/07/how-to-run-home-assistant-in-kubernetes/)
 - [tpmullan.com, Running Home Assistant on Kubernetes instead of the usual Docker path](https://tpmullan.com/2026/05/12/running-home-assistant-on-kubernetes-instead-of-the-usual-docker-path/), the most complete treatment and the strongest case for the cluster
+- [przemekhys/homeassistant-operator](https://github.com/przemekhys/homeassistant-operator), the only one offering a capability the Pi route cannot
 
 **The tooling is better than a first pass suggests, and two objections weaken.**
 
@@ -105,7 +106,7 @@ to moot here given ADR-003 put the RF gateway on MQTT over WiFi rather than USB.
 
 **The two objections that decide this do not move.**
 
-*No add-on store, though the replacement is a known pattern.* All six run HA
+*No add-on store, though the replacement is a known pattern.* All seven run HA
 Container; none retains the Supervisor. The pajikos chart offers exactly one add-on,
 code-server. The mysticrenji chart ships its own Mosquitto and Z-Wave JS deployments
 because there is nothing to install them from.
@@ -141,6 +142,38 @@ Kubernetes".
 Nothing in any of them touches the availability coupling, because that is a property
 of a single control plane that gets deliberately perturbed, not something a chart
 can fix.
+
+### The one genuine capability gain, and why it still waits
+
+The homeassistant-operator is the only option reviewed that offers something neither
+HA OS nor Docker Compose can. It exposes Home Assistant's own configuration as
+custom resources: automations, scenes, scripts, areas, floors, labels, integrations
+and secrets, reconciled from Git. It also handles device passthrough, backups,
+scheduling and network policy, and signs its release artifacts. That is a real
+argument for the cluster rather than a workaround for being on it, and it is the
+only such argument in seven sources.
+
+Two things hold it back for now.
+
+**Adoption.** Seven stars, no forks, a single maintainer, and parts of the API still
+`v1alpha1`. The engineering looks careful, with end-to-end tests, admission webhooks
+and an OpenSSF scorecard, but household lighting and blinds are a poor first place to
+depend on a project with no user base. If the author stops, the fallback is owning a
+Go operator.
+
+**It does not solve the add-on problem either.** There is no Supervisor and no
+add-on management. Mosquitto remains a separate deployment to run and configure.
+
+**Most of the benefit is available without any of this.** Home Assistant already
+stores automations, scenes and scripts as YAML under `/config`. Putting that
+directory in Git on the Pi gives version control, review and rollback of the same
+material, without an operator, a cluster or a CRD API in the path between a broken
+automation and the lights. The operator's genuine addition over that is reconciliation
+and drift correction, which is worth having eventually and is not worth household
+downtime now.
+
+Worth watching. If it gains adoption by the time the revisit conditions below hold,
+it becomes the reason to move rather than a footnote.
 
 **The clearest decision rule found comes from the most pro-Kubernetes source.**
 tpmullan opens with "I would not recommend Kubernetes as the default Home Assistant
