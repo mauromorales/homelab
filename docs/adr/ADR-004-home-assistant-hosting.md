@@ -82,7 +82,7 @@ this objection turns out to be the weakest of the four.
 
 ### Prior art reviewed
 
-Five community implementations were examined before settling this, because the
+Six community implementations were examined before settling this, because the
 question deserves evidence rather than assertion:
 
 - [pajikos/home-assistant-helm-chart](https://github.com/pajikos/home-assistant-helm-chart), the most popular and most actively maintained
@@ -90,6 +90,7 @@ question deserves evidence rather than assertion:
 - [swrm.io, Home Assistant on Kubernetes](https://swrm.io/posts/homeassistant_kubernetes/)
 - [jaygould.co.uk, Setting up Home Assistant on k3s](https://jaygould.co.uk/2024-01-01-setting-up-home-assistant-kubernetes-k3s/)
 - [blog.quadmeup.com, How to run Home Assistant in Kubernetes](https://blog.quadmeup.com/2025/04/07/how-to-run-home-assistant-in-kubernetes/)
+- [tpmullan.com, Running Home Assistant on Kubernetes instead of the usual Docker path](https://tpmullan.com/2026/05/12/running-home-assistant-on-kubernetes-instead-of-the-usual-docker-path/), the most complete treatment and the strongest case for the cluster
 
 **The tooling is better than a first pass suggests, and two objections weaken.**
 
@@ -104,12 +105,28 @@ to moot here given ADR-003 put the RF gateway on MQTT over WiFi rather than USB.
 
 **The two objections that decide this do not move.**
 
-*No add-on store.* All four run HA Container; none retains the Supervisor. The
-pajikos chart offers exactly one add-on, code-server. The mysticrenji chart
-demonstrates the cost directly: it ships its own Mosquitto and Z-Wave JS deployments
-because there is nothing to install them from. Two of the written accounts name this
-as the main drawback, one calling it "the biggest drawback". This is the concrete win
-of the Pi route, since one-click Mosquitto is what the RFX needs on the far side.
+*No add-on store, though the replacement is a known pattern.* All six run HA
+Container; none retains the Supervisor. The pajikos chart offers exactly one add-on,
+code-server. The mysticrenji chart ships its own Mosquitto and Z-Wave JS deployments
+because there is nothing to install them from.
+
+tpmullan gives the coherent version of this: put Home Assistant, MQTT, ESPHome, the
+Matter server and the device bridges in a *single multi-container pod*, so they share
+one network namespace and keep reaching each other over localhost exactly as they did
+under Compose. That is a real answer, not a workaround, and it is worth knowing.
+The cost is stated plainly by its own author: Home Assistant is no longer the place
+those services are installed or updated, so every add-on becomes an image, a set of
+environment variables, a config file, a volume and an update policy that you own. In
+their words, it "is not a better default for someone who wants Home Assistant to be
+the platform".
+
+Worth separating out, because it is easy to conflate: **HACS is unaffected.** It
+installs custom integrations into the `/config` directory rather than managing
+containers, so it works normally under Kubernetes as long as that directory persists.
+The loss is add-ons, not the community store.
+
+This still decides it here, because one-click Mosquitto is the concrete win of the Pi
+route and the RFX needs a broker on the far side.
 
 *Still a singleton.* Every implementation is single-replica, and not one moves the
 recorder off SQLite onto Postgres. Storage is ReadWriteOnce in all but quadmeup, who
@@ -125,9 +142,28 @@ Nothing in any of them touches the availability coupling, because that is a prop
 of a single control plane that gets deliberately perturbed, not something a chart
 can fix.
 
-**Revisit if** the cluster becomes multi-node and stable, and HA is moved to a
-Postgres recorder. At that point the pajikos chart is the starting point, not a
-from-scratch build.
+**The clearest decision rule found comes from the most pro-Kubernetes source.**
+tpmullan opens with "I would not recommend Kubernetes as the default Home Assistant
+install" and lists six conditions that should all hold first:
+
+1. You already run Kubernetes for other home lab services
+2. You already have GitOps or a similar deployment workflow
+3. You are comfortable owning the add-on replacements yourself
+4. You understand your local discovery and callback requirements
+5. You can provide a real LAN identity when integrations need it
+6. You have a rollback path that does not depend on wishful thinking
+
+This lab currently fails 1, 2 and 6. The cluster does not exist yet, there is no
+GitOps workflow, and the rollback path is the thing being learned. Their summary is
+the honest one: this "is only worth it if the platform already exists and is already
+part of how you operate the lab".
+
+**Revisit when those six hold**, in particular a cluster that exists, is multi-node
+and is no longer the thing being deliberately broken. At that point this is a
+migration with a known shape rather than a from-scratch build: the pajikos chart for
+the workload, a multi-container pod for the add-on replacements, Multus or a bridge
+CNI for LAN identity, `Recreate` with image pre-pull for rollouts, and a Postgres
+recorder to retire the SQLite constraint.
 
 ### Beelink SER5, rejected
 
