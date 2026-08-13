@@ -29,7 +29,10 @@ are non-structural plasterboard, effectively transparent at 433 MHz. The real RF
 obstacles are the structural walls and floor slabs. A stairwell provides a vertical
 void spanning the floors.
 
-**Requirement:** local control, no cloud dependency, no vendor account.
+**Requirement:** local control for this RF layer, with no cloud dependency and no
+vendor account. Scoped in [ADR-004](ADR-004-home-automation-platform.md): the control path for
+lights, screens and life-safety devices stays local and hub-independent, while cloud
+integrations are acceptable for conveniences that may degrade without consequence.
 
 ## Decision
 
