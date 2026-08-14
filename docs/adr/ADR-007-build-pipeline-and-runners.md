@@ -53,38 +53,55 @@ Checked 2026-08-14.
 
 ## Decision
 
-**Run the builds on self-hosted runners, in a VM on `midnight`, keeping GitHub Actions as
-the pipeline. Keep `homelab` public for now, and revisit visibility only after the runners
-work and storage has been measured.**
+**Keep GitHub-hosted runners for as long as the repository is public. Change nothing about
+the pipeline.**
 
-Sequenced, so each step is provable before the next one starts:
+**Pursue the dogfooding separately, by building an image by hand on `midnight`** — the
+`docker build` stage, then the factory stage through AuroraBoot — and write down what that
+takes. That is the user path. A self-hosted runner is not.
 
-1. **One amd64 runner, in a VM on `midnight`.** Change `runs-on` for the amd64 jobs and
-   prove a build produces the same artifact as the hosted pipeline does.
-2. **One arm64 runner on the spare Raspberry Pi 5**, so `thuroros` builds natively. Move it
-   to the Jetson Thor when that machine lands, since the Thor is the faster arm64 builder.
-3. **Measure the artifact storage** a full release actually consumes.
-4. **Only then re-open the visibility question**, with numbers rather than an assumption.
+### Why a self-hosted runner is the wrong tool for the stated goal
 
-### The runner goes in a VM, not on the host
+An earlier draft of this ADR recommended self-hosted runners in a VM, on dogfooding
+grounds. **That reasoning does not hold**, and the objection is Mauro's:
 
-**A runner executes whatever the workflow says.** `midnight` holds `mauro-agent`'s
-credentials, every clone, and the agent sessions themselves. A private repository with no
-fork pull requests makes the risk small, but "small" is not "absent", and the isolation is
-cheap.
+- **On cost, it buys nothing.** Hosted runners are already free on a public repository.
+- **On dogfooding, it buys almost nothing.** A self-hosted runner executes the same
+  workflow, calling the same reusable factory workflow, with the same inputs. It moves the
+  compute and changes nothing a Kairos user would experience. The differences are disk
+  size, preinstalled tooling and Docker version — real, but not the thing worth testing.
+- **It adds a failure mode**: "the build did not run because the VM was off."
 
-This also agrees with the machine-level rule that the host is not reconfigured for
-experiments. A VM is a thing that can be deleted; a runner installed on the host is not.
+**The genuinely untested path is the one `AGENTS.md` already names**: the factory stage is
+"CI-only; there is no simple local equivalent". That sentence is the dogfooding target. A
+runner leaves it exactly as untested as it is today, because the runner still invokes the
+CI path.
+
+### When this decision changes
+
+Three triggers, any one of which makes self-hosted runners the right answer:
+
+1. **The repository goes private.** Hosted minutes and hosted arm64 both start being
+   billed. This is the only trigger that is about money.
+2. **Hosted runners hit their limits.** Image builds are large and hosted runners ship
+   about 14 GB of free disk. If builds start failing on space, or take long enough to
+   obstruct iteration, self-hosting is the fix.
+3. **The cluster exists and can host CI**, at which point the interesting move is
+   Kubernetes-native rather than a self-hosted GitHub runner — see below.
+
+Until one of those happens, this ADR's answer is to leave a working, free pipeline alone.
 
 ## Alternatives considered
 
-### Keep GitHub-hosted runners and keep the repository public — the status quo
+### Self-hosted runners in a VM on `midnight` — rejected for now, and it was the first draft's recommendation
 
-Free, working, and zero effort. It is a perfectly good answer to the *cost* question and no
-answer at all to the *dogfooding* one, which is the motivation that matters more. It also
-leaves the visibility question permanently blocked.
+Correct for a private repository, and premature for a public one. The reasoning is in the
+Decision section above, because the rejection is the substance of this ADR rather than a
+footnote to it.
 
-Worth stating: **nothing is broken today.** This ADR is not fixing a failure.
+Keep the shape in mind for when a trigger fires: a VM rather than the host, because a
+runner executes whatever the workflow says and `midnight` holds `mauro-agent`'s
+credentials and every clone. That constraint does not expire.
 
 ### Forgejo or Gitea Actions, self-hosted — rejected, and not on technical grounds
 
@@ -132,29 +149,25 @@ worth moving.
 
 ### Positive
 
-- The factory runs on Mauro's own hardware, which is the user path and where upstream bugs
-  will surface
-- Native arm64 builds instead of hosted arm64 runners
-- The visibility question becomes answerable rather than permanently blocked
-- No workflow rewrite. `runs-on` labels change; the rest stands
-- A first, well-scoped use for the Jetson Thor
+- Nothing to build, maintain, or keep switched on. The pipeline that works keeps working
+- The dogfooding effort points at the part that is actually untested — the local factory
+  path — instead of at a runner that would still call CI
+- The triggers for revisiting are written down, so the question returns on evidence rather
+  than on a hunch
 
 ### Negative and accepted trade-offs
 
-- **Builds now depend on machines being up.** A hosted runner is somebody else's problem;
-  a self-hosted one is not. Expect the failure mode "the build did not run because the VM
-  was off"
-- Two runners to maintain, on two architectures
-- A VM on `midnight` consumes memory that the agent sessions currently have
-- **Storage may still be billed** if the repository goes private, and that is unmeasured
-- Kubernetes-native CI is deferred, so the GitOps ambition is recorded rather than met
+- **The visibility question stays blocked**, and that is now explicit rather than implied:
+  going private means solving arm64 and storage first
+- No progress toward the GitOps and Kubernetes-native ambition. Recorded, not met
+- Builds keep depending on GitHub. If hosted runners change terms again, this ADR is what
+  gets re-read
 
 ### Open questions
 
-1. **How much artifact storage does a full release consume?** This decides whether the
-   visibility question is actually unblocked. Measure before deciding.
-2. **Does the Pi 5 have the disk and memory to build an image?** If not, arm64 waits for
-   the Thor and `thuroros` keeps using the hosted arm64 runner while the repository stays
-   public.
-3. **Where does the runner VM's storage live**, given that shared storage is itself
-   undecided?
+1. **Can the factory stage be run locally at all, and what does it take?** This is the
+   dogfooding question, and it is worth a real attempt regardless of what CI does.
+2. **How much artifact storage does a full release consume?** Only matters if trigger 1
+   fires, and it should be measured before that decision rather than during it.
+3. **Are hosted runners close to their disk limit today?** If a build is already near
+   14 GB, trigger 2 is nearer than it looks.
