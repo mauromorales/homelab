@@ -9,163 +9,158 @@ preference), [ADR-005](ADR-005-home-assistant-host.md) (Home Assistant host), [A
 
 ## Context
 
-The lab has two 5-port TP-Link unmanaged gigabit switches. Neither supplies PoE. They are
-being given fixed roles:
+### The network as it actually is
 
-| Switch | Role |
-|---|---|
-| 5-port, existing | A dedicated physical network for the Kubernetes cluster |
-| 5-port, existing | The desk, so desk devices do not need a run to the rack |
-| **New switch** | **The rack — the aggregation point for everything else** |
+```
+router → Deco → 8-port TP-Link, no PoE → 5-port TP-Link, no PoE → 5-port TP-Link, no PoE
+                (distributes to all rooms)  (desk)                  (rack)
+```
 
-This ADR chooses the third one. The two existing switches are staying as they are and are
-not in question.
+Three unmanaged TP-Link switches in series, none with PoE. `thuroros`, the doorbell Pi,
+hangs off the 8-port because it must sit near the doorbell.
 
-### The port budget, which is the part that decides this
+**This is a daisy chain, not a star.** Every packet leaving the rack crosses the desk
+switch and then the room switch before it reaches the Deco.
 
-The rack switch is where everything meets. Counting what terminates there:
+### What is being proposed
+
+Replace the rack's 5-port with an 8-port, and move the freed 5-port to a dedicated
+physical network for the Kubernetes cluster. The desk keeps its own 5-port.
+
+### The port budget for the rack
 
 | Port | Device |
 |---|---|
-| 1 | Uplink to the router |
-| 2 | Uplink from the desk 5-port switch |
-| 3 | Uplink from the Kubernetes 5-port switch |
-| 4 | Beelink SER5 (`midnight`), the agent host |
-| 5 | HP ProDesk 600 G4, Kubernetes control plane |
-| 6 | New machine, incoming, Kubernetes worker |
-| 7 | Mac Mini M2, `mowa` and shared storage |
-| 8 | Raspberry Pi 4, Home Assistant ([ADR-005](ADR-005-home-assistant-host.md)) |
+| 1 | Uplink to the desk switch |
+| 2 | Uplink from the Kubernetes 5-port switch |
+| 3 | Beelink SER5 (`midnight`), the agent host |
+| 4 | HP ProDesk 600 G4, Kubernetes control plane |
+| 5 | New machine, incoming, Kubernetes worker |
+| 6 | Mac Mini M2, `mowa` and shared storage — *if it lives in the rack* |
+| 7 | Raspberry Pi 4, Home Assistant ([ADR-005](ADR-005-home-assistant-host.md)) |
+| 8 | Spare |
 
-**Eight ports, and every one of them is spoken for before anything new arrives.** That is
-without the doorbell Pi (`thuroros`), without the spare Pi 5, without a laptop plugged in
-temporarily, and without the cameras below. A switch that is full on the day it is
-installed is the wrong switch.
+**Seven of eight, with one spare. Eight ports is the right size for the rack.**
 
-### PoE is not hypothetical here, and two existing ADRs say so
+### PoE belongs on the room switch, not this one
 
-[ADR-004](ADR-004-home-automation-platform.md) lists "one or two security cameras,
-RTSP/ONVIF" under planned devices. Cameras of that class are overwhelmingly PoE, and their
-cable runs terminate at the rack, not at the desk.
-
-The same ADR states a device-selection constraint in writing:
+[ADR-004](ADR-004-home-automation-platform.md) plans "one or two security cameras,
+RTSP/ONVIF", and states a device-selection constraint in writing:
 
 > If Zigbee ever becomes necessary, prefer an Ethernet or PoE coordinator over a USB one,
 > for the same reason ADR-003 chose a network-attached RF gateway.
 
-So the lab has already committed, on paper, to preferring PoE devices where a choice
-exists. **Buying a switch without PoE contradicts the direction of a decision that is
-already recorded**, and the recovery is either injectors or buying the switch twice.
+Both of those devices live in rooms. **Cameras and access points terminate on the 8-port
+that feeds the rooms, and that switch is not the subject of this ADR.** The PoE argument
+is real and it applies elsewhere — recorded here so it is not lost, and so nobody buys PoE
+for the rack on the strength of it.
+
+Nothing in the rack takes power over Ethernet. The machines there have their own supplies.
+
+### The daisy chain is the more interesting problem
+
+It is worth stating plainly, because it costs more than the choice of switch model:
+
+- **All rack traffic shares one gigabit link through the desk switch.** Cluster traffic and
+  storage traffic to the Mac Mini both cross it. The rack is the densest part of the
+  network and it sits behind the thinnest link.
+- **The desk is now a dependency of the rack.** Unplugging something at the desk, or
+  knocking the switch's power out, takes the rack with it. A desk is a place where cables
+  get moved.
+- **Three unmanaged hops** make any future VLAN work harder, because every hop has to pass
+  tagged traffic.
+
+**Moving the rack switch to hang directly off the room 8-port, in parallel with the desk
+rather than behind it, costs one cable and no money.** That is a bigger improvement than
+any switch on the shortlist.
 
 ### Managed or not
 
-Nothing in the lab needs VLANs today. Two things soon will:
+Nothing needs VLANs today. The cluster is a teaching instrument, and VLANs, tagged trunks
+and port isolation are part of what it exists to teach. TP-Link's "Easy Smart" tier adds
+port-based and tag-based VLANs, QoS, IGMP snooping and LAG from a web page, for roughly
+€10 more than the unmanaged equivalent. It is not a full managed switch and does not
+pretend to be.
 
-- **A camera is an untrusted device on your LAN.** ONVIF cameras phone home, ship poor
-  firmware, and are rarely updated. Segmenting them onto their own VLAN is the standard
-  answer and it is much easier to do at install time than to retrofit.
-- **The cluster is a teaching instrument.** VLANs, tagged trunks and port isolation are
-  part of what it is there to teach, and the physical-separation approach chosen for the
-  Kubernetes network only goes so far before it needs a trunk.
-
-TP-Link's "Easy Smart" tier is the relevant one: port-based and tag-based VLANs, QoS,
-IGMP snooping and LAG, configured from a web page. It is not a full managed switch and
-does not pretend to be. For this lab it is the right rung — a full managed switch is more
-CLI than the rack currently justifies.
+Ten euros to keep that door open, on the switch in front of the cluster, is cheap. It is
+the only real argument against the plain unmanaged unit.
 
 ## Decision
 
-**Buy the [TP-Link TL-SG1016PE](https://www.tp-link.com/us/business-networking/easy-smart-switch/tl-sg1016pe/):
-16 gigabit ports, 8 of them PoE+ with a 150 W budget, Easy Smart management, rack-mountable.**
+**Buy a TP-Link TL-SG108E for the rack: 8 gigabit ports, Easy Smart, no PoE. Roughly €25
+to €35.**
 
-Three reasons, in order of weight:
+**And re-cable the rack to hang off the room 8-port directly, rather than behind the desk
+switch.** The re-cabling matters more than the model choice and costs one cable.
 
-1. **Sixteen ports.** Eight is already full, as counted above. Sixteen leaves room for the
-   doorbell Pi, the spare Pi 5, cameras, and whatever gets plugged in for an afternoon.
-2. **PoE where the camera runs land.** 150 W across eight PoE+ ports covers two or three
-   cameras, a PoE Zigbee coordinator and a PoE access point, with room left over.
-3. **It is rack-mountable.** The 8-port alternatives are desktop units. This is a rack.
+Three reasons:
 
-It also keeps the brand already in use, so the two existing switches and this one behave
-the same way.
+1. **Eight ports fits**, with one spare — as counted above.
+2. **No PoE, because nothing in the rack needs it.** Camera and coordinator PoE is a
+   question for the room switch, later, when those devices exist.
+3. **Easy Smart, for about €10 over unmanaged**, so the cluster has VLANs available when
+   the learning work reaches them. This is the only part of the decision that is
+   speculative, and it is the cheapest part.
 
 ## Alternatives considered
 
-### TP-Link LS108G, the original proposal — rejected
+### TP-Link LS108G, Mauro's original proposal — viable, and nearly right
 
 [LS108G](https://www.tp-link.com/us/home-networking/8-port-switch/ls108g/): 8 ports,
-unmanaged, no PoE, steel case, roughly €20. It is a well-built and very cheap port
-expander, and as a *desk* switch it would be a fine choice.
+unmanaged, no PoE, steel case, roughly €20.
 
-Rejected for the rack on three counts, any one of which is sufficient: **it is full on
-day one** by the count above, **it has no PoE** despite ADR-004 planning PoE-class
-devices, and **it has no VLAN support** for the camera segmentation that follows those
-devices. The €20 price is real, but the cost of replacing it in six months is the whole
-€20 plus the swap.
+**The port count judgement was correct.** An earlier draft of this ADR rejected it as
+"full on day one"; that was based on a wrong picture of the topology, which assumed the
+rack switch carried a router uplink. It does not — it carries one uplink to the desk. The
+count is seven of eight.
 
-### TP-Link LS108GP — rejected
+It is rejected only on the VLAN question, and only by about €10. **If VLANs are not
+wanted, buy this one.** It is the same family as the two existing 5-ports and it will
+behave identically.
 
-[LS108GP](https://www.tp-link.com/us/business-networking/soho-switch-poe/ls108gp/): 8
-ports, all PoE+, 62 W budget, unmanaged, roughly €45. Solves PoE and nothing else. Still
-eight ports, still no VLANs.
+### TL-SG108PE, 4 PoE+ ports at 64 W — rejected
 
-### TP-Link TL-SG108PE — rejected, and it was the close one
+Roughly €46 to €63. Nothing in the rack draws PoE, so this is paying for a feature at the
+wrong location. Reconsider it for the **room** switch when cameras arrive.
 
-[TL-SG108PE](https://www.tp-link.com/us/business-networking/poe-switch/tl-sg108pe/): 8
-ports with 4 PoE+ at 64 W, Easy Smart, roughly €46 to €63. This solves PoE *and*
-management at a third of the price of the recommendation, and four PoE ports is genuinely
-enough for the planned devices.
+### TL-SG1016PE, 16 ports with 8 PoE+ — rejected
 
-**It fails only on the port count** — which is the one axis with no workaround short of
-adding another switch and another hop. Worth reconsidering if the port table above turns
-out to be wrong, in particular if the Kubernetes switch does not uplink to the rack.
+Roughly six to eight times the price of the LS108G, for ports the rack does not need and
+PoE at the wrong end of the house. This was the recommendation in the first draft of this
+ADR, before the topology was known. It was wrong.
 
-### A 16-port switch without PoE — viable if PoE is rejected
+### Keep the 5-port in the rack — rejected
 
-If Mauro decides cameras are not happening, a 16-port Easy Smart switch without PoE costs
-substantially less and keeps the port headroom, which is the more important half of this
-decision. **Do not buy an 8-port model in that case** — the port count argument stands on
-its own, independently of PoE.
-
-### A full managed switch — rejected for now
-
-More configuration surface than the rack justifies today, and the Easy Smart tier already
-covers VLANs. Revisit if the cluster work starts to need 802.1X, meaningful L3, or
-per-port policy that a web page cannot express.
+Five ports cannot carry the seven devices listed above, and the Kubernetes switch has to
+come from somewhere. Replacing it is the reason this ADR exists.
 
 ## Consequences
 
 ### Positive
 
-- The rack has spare ports, so the next device does not force a purchase
-- Camera runs terminate on a switch that can power them, with no injectors
-- Camera and IoT segmentation is available when it is needed, rather than a retrofit
-- Rack-mounted rather than a desktop box balanced on a shelf
-- Same vendor and the same management model as the two existing switches
+- Correct size, with one spare port, at a cost close to Mauro's original proposal
+- VLANs available in front of the cluster when the learning work needs them
+- Same vendor and management model as the existing switches
+- The re-cabling removes the desk from the rack's failure path at no cost
 
 ### Negative and accepted trade-offs
 
-- **Roughly six to eight times the price of the LS108G.** This is the real cost of the
-  decision and it should be weighed as such
-- Sixteen ports and 150 W is more than the lab needs today. That is the point, and it is
-  still overprovisioning
-- PoE switches with a large budget are physically bigger and draw more idle power than a
-  passive 8-port unit. Relevant to [#145](https://github.com/mauromorales/mission-control/issues/145),
-  the UPS sizing ticket, which should measure it rather than assume
-- Easy Smart is a ceiling. If the cluster later needs real managed features, this switch
-  gets replaced rather than upgraded
+- **Easy Smart is a ceiling.** If the cluster later needs 802.1X, real L3 or per-port
+  policy, this switch is replaced rather than upgraded
+- **VLAN support in the rack is of limited use while the other three hops are unmanaged.**
+  Tagged traffic has to cross them. It buys isolation *within* the rack now, and a
+  starting point later — not end-to-end segmentation today
+- Roughly €10 more than the unmanaged unit, for a feature that may go unused
+- **No PoE anywhere in the lab, still.** That decision is deferred, not made. It comes due
+  when the first camera is bought, and it lands on the room switch
 
-### Open questions, to be answered before purchase
+### Open questions
 
-1. **Does the Kubernetes switch uplink to the rack switch, or is that network truly
-   isolated?** If isolated, the cluster nodes need a second NIC each to reach the
-   internet, and the rack switch needs one port fewer. This changes the port count and it
-   is the assumption most likely to be wrong.
-2. **Do the camera cable runs terminate in the rack?** If they land elsewhere, PoE belongs
-   on a different switch and this decision changes.
-3. **Is `thuroros`, the doorbell Pi, wired to the rack or is it on WiFi?**
-4. **Is there a budget ceiling?** It decides between this recommendation and the
-   TL-SG108PE.
+1. **Is the Mac Mini in the rack, or at the desk?** It changes the count from seven to six.
+2. **Can the rack be re-cabled to the room switch directly**, or is the run to the desk
+   the only physical path available?
+3. **Where would camera runs terminate?** Assumed to be the room switch. If they would
+   come to the rack instead, this ADR changes and PoE returns to the table.
 
-**Prices quoted are from August 2026 European listings and are indicative.** Confirm the
-current price locally before ordering; the euro price for the TL-SG1016PE was not verified
-from a Belgian retailer while writing this.
+**Prices are indicative, from August 2026 listings, and were not verified at a Belgian
+retailer.** Confirm locally before ordering.
