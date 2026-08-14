@@ -225,11 +225,31 @@ Roughly €25 to €35. Solves the VLAN half and fails on the port count, exactl
 LS108G. **This was the recommendation of the previous revision of this ADR**, written
 before the board inventory was known.
 
-### TP-Link TL-SG116E, 16 ports Easy Smart — viable, and about €58
+### TP-Link TL-SG116E, 16 ports Easy Smart desktop — rejected on price and lead time
 
-Functionally equivalent to the recommendation at a lower price. **The difference is form
-factor: it is a desktop unit, not 19-inch rack-mountable.** In a rack that matters more
-than the €15, but not by much. Buy it if the rack has a shelf and the saving is wanted.
+Functionally equivalent to the recommendation, in a smaller desktop case: roughly
+209 × 126 × 26 mm against 294 × 180 × 44 mm.
+
+**The "rack" here is an IKEA shelf, not a 19-inch cabinet**, so the mounting ears are of no
+use and this model should have won. It does not, because of what Belgian retailers
+actually charge on 2026-08-14:
+
+| Model | MediaMarkt.be | Alternate.be |
+|---|---|---|
+| TL-SG1016DE | €74.99, in stock, next day | €79.90, in stock |
+| TL-SG116E | €86.49, marketplace seller, 8–10 days | €79.90, **11 working days** |
+
+**The rack-mount model is cheaper and available now.** An earlier revision of this ADR
+quoted about €58 for the TL-SG116E; that was a non-Belgian listing and it should not have
+been carried into a decision about what to buy here.
+
+Buy this one only if shelf depth rules the larger case out.
+
+### TP-Link TL-SG116, without the E — a trap, not an alternative
+
+Nearly the same name, about €55, and **unmanaged**. No VLANs, so no netboot segment. It
+sits next to the TL-SG116E in search results, which is exactly how it gets bought by
+accident. Named here so that does not happen.
 
 ### TL-SG108PE, 4 PoE+ ports at 64 W — rejected
 
