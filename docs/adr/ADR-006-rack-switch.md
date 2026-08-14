@@ -31,6 +31,12 @@ Mauro's stated goal for where things live:
 - **The rack** holds everything else, including `polaris`, the Mac Mini that runs
   [mowa](https://github.com/mauromorales/mowa)
 
+"Everything else" is larger than the servers. The lab also holds, or expects to hold, a
+Raspberry Pi 5, a Radxa board, a work laptop, an NVIDIA Jetson Thor, and a RISC-V board
+once [#99](https://github.com/mauromorales/mission-control/issues/99) picks one. **These
+are not an afterthought — testing Kairos on real boards is the point of the lab**, and
+each one wants a wired port while it is being worked on.
+
 The desk and the rack are physically next to each other, so the order of the two switches
 in the chain is a free choice rather than a constraint.
 
@@ -38,23 +44,29 @@ in the chain is a free choice rather than a constraint.
 router → Deco → 8-port, no PoE ─┬─ thuroros (doorbell)
                 (power cabinet) ├─ … the rooms
                                 │
-                                └─ 8-port, NEW (rack) ─┬─ midnight
-                                                       ├─ HP ProDesk (control plane)
-                                                       ├─ new worker
-                                                       ├─ Home Assistant Pi
-                                                       ├─ polaris (mowa)
-                                                       ├─ 5-port (Kubernetes segment)
-                                                       └─ spare, or stardust
+                                └─ 16-port, NEW (rack) ─┬─ midnight
+                                                        ├─ HP ProDesk (control plane)
+                                                        ├─ new worker
+                                                        ├─ Home Assistant Pi
+                                                        ├─ polaris (mowa)
+                                                        ├─ Jetson Thor
+                                                        ├─ Raspberry Pi 5
+                                                        ├─ Radxa
+                                                        ├─ RISC-V board (planned)
+                                                        ├─ work laptop
+                                                        ├─ 5-port (isolated segment)
+                                                        └─ spare ×4
 
-stardust (desk) → WiFi, or a cable to the rack's spare port
+stardust (desk) → WiFi, or a cable to the rack
 ```
 
 The desk switch is gone, and the chain is two hops deep instead of three.
 
 ### What is being proposed
 
-Replace the rack's 5-port with an 8-port, and move the freed 5-port to a dedicated
-physical network for the Kubernetes cluster.
+Replace the rack's 5-port with a 16-port, and move the freed 5-port to a dedicated
+physical segment — for the Kubernetes cluster, for netboot testing, or as a cold spare.
+That choice is out of scope here.
 
 **And retire the desk switch.** With only `stardust` left on the desk, a 5-port switch
 would serve a single device. Either one cable from the rack, or WiFi — see below. Either
@@ -63,21 +75,35 @@ a spare.
 
 ### The port budget for the rack
 
-| Port | Device |
+**Permanent residents**
+
+| # | Device |
 |---|---|
 | 1 | Uplink to the 8-port in the power cabinet |
-| 2 | Uplink from the Kubernetes 5-port switch |
+| 2 | Uplink from the 5-port on the isolated segment |
 | 3 | Beelink SER5 (`midnight`), the agent host |
 | 4 | HP ProDesk 600 G4, Kubernetes control plane |
 | 5 | New machine, incoming, Kubernetes worker |
 | 6 | Raspberry Pi 4, Home Assistant ([ADR-005](ADR-005-home-assistant-host.md)) |
 | 7 | `polaris`, Mac Mini M2, runs `mowa` |
-| 8 | Spare, or `stardust` if the desk is wired |
+| 8 | NVIDIA Jetson Thor |
 
-**Seven of eight, and the eighth is optional. Eight ports is the right size for the rack.**
+**Boards and machines that come and go**
 
-Note that wiring `stardust` fills the switch. That is acceptable — a spare port is nice,
-not necessary — but it is worth knowing before the decision rather than after.
+| # | Device |
+|---|---|
+| 9 | Raspberry Pi 5 |
+| 10 | Radxa board |
+| 11 | RISC-V board, once [#99](https://github.com/mauromorales/mission-control/issues/99) chooses one |
+| 12 | Work laptop |
+| 13 | `stardust`, if the desk is wired rather than on WiFi |
+
+**Thirteen, against eight ports.** An 8-port switch is not merely tight, it is short by
+five before anything unplanned arrives.
+
+The second group is genuinely intermittent — no more than two or three of those boards are
+usually powered at once — so the honest number is somewhere between nine and thirteen.
+**It is above eight either way, and that is what decides this ADR.**
 
 ### WiFi for `stardust` — acceptable
 
@@ -128,6 +154,28 @@ runs through a desk.
 Reversing the order instead — rack first, desk behind it — would fix the dependency
 direction but keep the extra hop and the extra box, for one device.
 
+### The boards need a network the Deco does not control
+
+This is the part that makes VLAN support concrete rather than speculative.
+
+Kairos boards are provisioned by netboot. AuroraBoot runs on `midnight` and has to serve
+DHCP and TFTP to the machine being installed. **A second DHCP server on the main LAN
+fights the Deco**, and the loser is whichever device asks at the wrong moment — including
+the household ones. So netboot testing wants a segment where `midnight` can serve DHCP
+without touching anything the house depends on.
+
+There are two ways to get one, and the switch choice decides which is available:
+
+- **Physically**, on the freed 5-port switch. Works with any switch, costs a cable, and is
+  limited to five devices.
+- **As a VLAN** on the rack switch, which needs an Easy Smart or better. Any port can join
+  the netboot segment, and it can be changed from a web page rather than by moving cables.
+
+**The second is the reason to pay for management, and it is not hypothetical** — it is how
+the riscv64 and Jetson work will actually be done. Note also that this reframes the
+5-port's role: "the Kubernetes segment" was one candidate use, and an isolated netboot
+segment is another. That choice is out of scope here.
+
 ### Managed or not
 
 Nothing needs VLANs today. The cluster is a teaching instrument, and VLANs, tagged trunks
@@ -141,8 +189,8 @@ the only real argument against the plain unmanaged unit.
 
 ## Decision
 
-**Buy a TP-Link TL-SG108E for the rack: 8 gigabit ports, Easy Smart, no PoE. Roughly €25
-to €35.**
+**Buy a TP-Link TL-SG1016DE for the rack: 16 gigabit ports, Easy Smart, no PoE,
+19-inch rack-mountable. Roughly €70 to €80.**
 
 **Re-cable the rack to hang off the cabinet 8-port directly, and retire the desk switch.**
 The Mac Mini takes a cable from the rack. The cabling matters more than the model choice
@@ -150,28 +198,38 @@ and costs one cable.
 
 Three reasons:
 
-1. **Eight ports fits**, with one spare — as counted above.
+1. **Thirteen devices, and eight ports cannot hold them.** The boards are the lab's
+   purpose, not its overflow.
 2. **No PoE, because nothing in the rack needs it.** Camera and coordinator PoE is a
-   question for the room switch, later, when those devices exist.
-3. **Easy Smart, for about €10 over unmanaged**, so the cluster has VLANs available when
-   the learning work reaches them. This is the only part of the decision that is
-   speculative, and it is the cheapest part.
+   question for the cabinet switch, later, when those devices exist.
+3. **Easy Smart, because netboot needs an isolated segment** and a VLAN gives one on any
+   port without moving cables. This was the speculative part of an earlier draft. It is not
+   speculative any more.
+
+It is also rack-mountable, which the 8-port desktop units are not, and this is a rack.
 
 ## Alternatives considered
 
-### TP-Link LS108G, Mauro's original proposal — viable, and nearly right
+### TP-Link LS108G, Mauro's original proposal — rejected
 
 [LS108G](https://www.tp-link.com/us/home-networking/8-port-switch/ls108g/): 8 ports,
 unmanaged, no PoE, steel case, roughly €20.
 
-**The port count judgement was correct.** An earlier draft of this ADR rejected it as
-"full on day one"; that was based on a wrong picture of the topology, which assumed the
-rack switch carried a router uplink. It does not — it carries one uplink to the desk. The
-count is seven of eight.
+Eight ports against thirteen devices, and no VLAN for the netboot segment. It remains an
+excellent switch for what it is, and the freed 5-port covers the same need more cheaply if
+the answer turns out to be "add another small switch".
 
-It is rejected only on the VLAN question, and only by about €10. **If VLANs are not
-wanted, buy this one.** It is the same family as the two existing 5-ports and it will
-behave identically.
+### TP-Link TL-SG108E, 8 ports Easy Smart — rejected
+
+Roughly €25 to €35. Solves the VLAN half and fails on the port count, exactly like the
+LS108G. **This was the recommendation of the previous revision of this ADR**, written
+before the board inventory was known.
+
+### TP-Link TL-SG116E, 16 ports Easy Smart — viable, and about €58
+
+Functionally equivalent to the recommendation at a lower price. **The difference is form
+factor: it is a desktop unit, not 19-inch rack-mountable.** In a rack that matters more
+than the €15, but not by much. Buy it if the rack has a shelf and the saving is wanted.
 
 ### TL-SG108PE, 4 PoE+ ports at 64 W — rejected
 
@@ -180,21 +238,30 @@ wrong location. Reconsider it for the **room** switch when cameras arrive.
 
 ### TL-SG1016PE, 16 ports with 8 PoE+ — rejected
 
-Roughly six to eight times the price of the LS108G, for ports the rack does not need and
-PoE at the wrong end of the house. This was the recommendation in the first draft of this
-ADR, before the topology was known. It was wrong.
+The same 16 ports as the recommendation, plus PoE at the wrong end of the house, for
+roughly twice the price. **This was the first draft's recommendation, and the port count
+turned out to be right for a reason that draft never gave** — dev boards, not cameras.
+The PoE half is still wrong.
 
 ### Keep the 5-port in the rack — rejected
 
-Five ports cannot carry the seven devices listed above, and the Kubernetes switch has to
-come from somewhere. Replacing it is the reason this ADR exists.
+Five ports cannot carry thirteen devices, and the isolated segment needs a switch of its
+own. Replacing it is the reason this ADR exists.
+
+### Stack two 8-port switches instead — rejected
+
+Two cheap 8-ports cost about the same as one 16-port and give 14 usable ports after the
+link between them. They also add a hop, a second power supply, and a bottleneck on the
+link — and neither would carry VLANs unless both are Easy Smart, at which point the saving
+is gone.
 
 ## Consequences
 
 ### Positive
 
-- Correct size, with one spare port, at a cost close to Mauro's original proposal
-- VLANs available in front of the cluster when the learning work needs them
+- Correct size, with roughly four spare ports, so the next board does not force a purchase
+- A netboot VLAN is available on any port, without a second DHCP server on the household
+  LAN and without moving cables
 - Same vendor and management model as the existing switches
 - The re-cabling removes the desk from the rack's failure path at no cost, and drops the
   chain from three unmanaged hops to two
@@ -209,7 +276,11 @@ come from somewhere. Replacing it is the reason this ADR exists.
 - **VLAN support in the rack is of limited use while the other three hops are unmanaged.**
   Tagged traffic has to cross them. It buys isolation *within* the rack now, and a
   starting point later — not end-to-end segmentation today
-- Roughly €10 more than the unmanaged unit, for a feature that may go unused
+- Roughly €50 to €60 more than Mauro's original proposal. That is the real cost of the
+  decision and it should be weighed as such
+- Sixteen ports draws more idle power than an 8-port unit. Relevant to
+  [#145](https://github.com/mauromorales/mission-control/issues/145), the UPS sizing
+  ticket, which should measure it rather than assume
 - **No PoE anywhere in the lab, still.** That decision is deferred, not made. It comes due
   when the first camera is bought, and it lands on the room switch
 
