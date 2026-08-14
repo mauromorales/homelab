@@ -17,7 +17,7 @@ This lab is my personal sandbox for exploring OS design, Kubernetes architecture
 
 | Device | Name | Role in Lab | Status | CPU | GPU | Memory | Storage |
 | ------ | ---- | ----------- | ------ | --- | --- | ------ | ------- |
-| Beelink SER5 | [`midnight`](./nodes/midnight/README.md) | Always-on agent host | Running | AMD Ryzen | Integrated Radeon | 32 GB | TBC |
+| Beelink SER5 | [`midnight`](./nodes/midnight/README.md) | Always-on agent host | Running | Ryzen 7 5825U, 8C/16T | Radeon (integrated) | 64 GB DDR4-3200 | 1 TB NVMe SSD |
 | HP ProDesk 600 G4 Mini | TBC | Control Plane & Worker | Planned | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
 | Mac Mini | `polaris` | iCloud Supporting Services | Running | M2 | M2 | 8G | 256 GB SSD |
 | Raspberry Pi 4 | [`thuroros`](./nodes/thuroros/README.md) | Doorbell relay | Running | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
