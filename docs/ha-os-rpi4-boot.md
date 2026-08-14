@@ -1,6 +1,6 @@
 # Runbook: diagnosing a Home Assistant OS boot on the Raspberry Pi 4
 
-Host: the spare Raspberry Pi 4 chosen in [ADR-005](adr/ADR-005-home-assistant-host.md),
+Host: the spare Raspberry Pi 4 chosen in homelab ADR-005 (private steering repository),
 running Home Assistant OS from a USB SSD.
 
 This runbook exists because a board that was booting perfectly looked dead for several
@@ -262,7 +262,7 @@ and leave it alone for twenty minutes.
 
 - **Boot from the USB SSD, never an SD card.** The recorder writes continuously and will
   wear an SD card out. This is the most common cause of Pi-hosted Home Assistant failure,
-  and it is why [ADR-005](adr/ADR-005-home-assistant-host.md) specifies SSD boot.
+  and it is why homelab ADR-005 (private steering repository) specifies SSD boot.
 - **Check the SSD is on a USB 3 port and negotiates SuperSpeed.** On this board it was
   found behind a VIA Labs USB 2.0 hub (`2109:3431`) running at 480 Mbps, which loses USB
   3 entirely. Read the negotiated link speed from `dmesg` rather than trusting the port
