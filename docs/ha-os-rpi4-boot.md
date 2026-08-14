@@ -94,8 +94,25 @@ with sub-millisecond round trips means the host is on the same subnet with no ro
 
 ## Restoring the HDMI console
 
-Change **one variable at a time** and record the result before starting the next. Three
-fixes applied together prove nothing about which one worked.
+### Plug in a real monitor. That is the whole fix.
+
+**Confirmed on this board, 2026-08-14.** The same Pi, on the same cable and the same
+boot, shows the full console on a normal monitor and dies at the handover on an Elgato
+HDMI capture card. Nothing on the Pi needed changing.
+
+**The faulty component was on the far end of the cable.** Every one of the four hardware
+swaps was aimed at the Pi, and the Pi was never the problem. A capture card is a sink
+built for a steady, already-negotiated stream. The `vc4-kms-v3d` handover tears HDMI down
+and renegotiates it, and the card does not follow. A monitor does.
+
+**So the first test for any dark console on this board is: try a monitor before you touch
+the board.** It costs one cable swap and it discriminates immediately — which is exactly
+what the four hardware swaps failed to do.
+
+### If a monitor is not available
+
+Only then, change **one variable at a time**, and record the result before starting the
+next. Three fixes applied together prove nothing about which one worked.
 
 1. Try the other HDMI port — HDMI0, the one nearest the USB-C jack.
 2. In `config.txt` on the `hassos-boot` partition, set `hdmi_group=1`, `hdmi_mode=16`,
@@ -103,6 +120,9 @@ fixes applied together prove nothing about which one worked.
    through the handover.
 3. Replace `dtoverlay=vc4-kms-v3d` with `dtoverlay=vc4-fkms-v3d`, which keeps the
    firmware framebuffer path instead of handing over to full KMS.
+
+These are worth keeping because a capture card is sometimes the only sink available. They
+are no longer the first thing to reach for.
 
 ## Set up the serial console first, not last
 
