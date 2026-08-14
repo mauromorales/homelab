@@ -26,9 +26,10 @@ switch and then the room switch before it reaches the Deco.
 
 Mauro's stated goal for where things live:
 
-- **The desk** holds only the Mac Mini
+- **The desk** holds only `stardust`
 - **The main power cabinet** holds `thuroros`, which must stay near the doorbell
-- **The rack** holds everything else
+- **The rack** holds everything else, including `polaris`, the Mac Mini that runs
+  [mowa](https://github.com/mauromorales/mowa)
 
 The desk and the rack are physically next to each other, so the order of the two switches
 in the chain is a free choice rather than a constraint.
@@ -38,9 +39,10 @@ in the chain is a free choice rather than a constraint.
 Replace the rack's 5-port with an 8-port, and move the freed 5-port to a dedicated
 physical network for the Kubernetes cluster.
 
-**And retire the desk switch.** With only the Mac Mini left on the desk, a 5-port switch
-would serve a single device. One cable from the rack does the same job with one less box,
-one less power supply and one less hop. The freed 5-port becomes a spare.
+**And retire the desk switch.** With only `stardust` left on the desk, a 5-port switch
+would serve a single device. Either one cable from the rack, or WiFi — see below. Either
+way the switch goes, along with a box, a power supply and a hop. The freed 5-port becomes
+a spare.
 
 ### The port budget for the rack
 
@@ -52,18 +54,26 @@ one less power supply and one less hop. The freed 5-port becomes a spare.
 | 4 | HP ProDesk 600 G4, Kubernetes control plane |
 | 5 | New machine, incoming, Kubernetes worker |
 | 6 | Raspberry Pi 4, Home Assistant ([ADR-005](ADR-005-home-assistant-host.md)) |
-| 7 | Mac Mini M2 at the desk, `mowa` and shared storage |
-| 8 | Spare |
+| 7 | `polaris`, Mac Mini M2, runs `mowa` |
+| 8 | Spare, or `stardust` if the desk is wired |
 
-**Seven of eight, with one spare. Eight ports is the right size for the rack.**
+**Seven of eight, and the eighth is optional. Eight ports is the right size for the rack.**
 
-### WiFi for the Mac Mini, considered and rejected
+Note that wiring `stardust` fills the switch. That is acceptable — a spare port is nice,
+not necessary — but it is worth knowing before the decision rather than after.
 
-Mesh coverage at the desk is good, and one machine on WiFi would be acceptable for general
-use. It is rejected because of *which* machine it is: the Mac Mini serves shared storage
-for the lab and is the intended target for Home Assistant's off-box backups. **A backup
-target on variable mesh throughput is a poor foundation, particularly for backups that
-have never been restore-tested.** It sits beside the rack, so a cable costs a cable.
+### WiFi for `stardust` — acceptable
+
+Mesh coverage at the desk is good, and `stardust` is a workstation rather than
+infrastructure. **Nothing in the lab depends on it being reachable**, so variable
+throughput costs its user some convenience and costs the lab nothing.
+
+This is a genuine choice rather than a compromise. Wire it if the desk is tidy enough to
+want one more cable; leave it on WiFi otherwise.
+
+**The reasoning would be different for `polaris`**, which serves `mowa` and may later
+serve shared storage. That machine is in the rack and wired, so the question does not
+arise.
 
 ### PoE belongs on the room switch, not this one
 
@@ -172,6 +182,8 @@ come from somewhere. Replacing it is the reason this ADR exists.
 - The re-cabling removes the desk from the rack's failure path at no cost, and drops the
   chain from three unmanaged hops to two
 - One less box and one less power supply at the desk, and a spare 5-port switch
+- `stardust` on WiFi is a supported outcome rather than a fallback, since nothing in the
+  lab depends on that machine
 
 ### Negative and accepted trade-offs
 
@@ -192,6 +204,8 @@ come from somewhere. Replacing it is the reason this ADR exists.
    come to the rack instead, this ADR changes and PoE returns to the table.
 3. **What happens to the spare 5-port** once the desk switch is retired? A second
    Kubernetes segment and a cold spare are both reasonable. Not decided here.
+4. **Where does shared storage live?** Undecided, and it deserves its own ADR. It is out of
+   scope here, but it could add a device to the rack and therefore claim the spare port.
 
 **Prices are indicative, from August 2026 listings, and were not verified at a Belgian
 retailer.** Confirm locally before ordering.
