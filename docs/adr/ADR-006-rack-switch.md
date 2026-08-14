@@ -22,25 +22,48 @@ hangs off the 8-port because it must sit near the doorbell.
 **This is a daisy chain, not a star.** Every packet leaving the rack crosses the desk
 switch and then the room switch before it reaches the Deco.
 
+### The target layout
+
+Mauro's stated goal for where things live:
+
+- **The desk** holds only the Mac Mini
+- **The main power cabinet** holds `thuroros`, which must stay near the doorbell
+- **The rack** holds everything else
+
+The desk and the rack are physically next to each other, so the order of the two switches
+in the chain is a free choice rather than a constraint.
+
 ### What is being proposed
 
 Replace the rack's 5-port with an 8-port, and move the freed 5-port to a dedicated
-physical network for the Kubernetes cluster. The desk keeps its own 5-port.
+physical network for the Kubernetes cluster.
+
+**And retire the desk switch.** With only the Mac Mini left on the desk, a 5-port switch
+would serve a single device. One cable from the rack does the same job with one less box,
+one less power supply and one less hop. The freed 5-port becomes a spare.
 
 ### The port budget for the rack
 
 | Port | Device |
 |---|---|
-| 1 | Uplink to the desk switch |
+| 1 | Uplink to the 8-port in the power cabinet |
 | 2 | Uplink from the Kubernetes 5-port switch |
 | 3 | Beelink SER5 (`midnight`), the agent host |
 | 4 | HP ProDesk 600 G4, Kubernetes control plane |
 | 5 | New machine, incoming, Kubernetes worker |
-| 6 | Mac Mini M2, `mowa` and shared storage — *if it lives in the rack* |
-| 7 | Raspberry Pi 4, Home Assistant ([ADR-005](ADR-005-home-assistant-host.md)) |
+| 6 | Raspberry Pi 4, Home Assistant ([ADR-005](ADR-005-home-assistant-host.md)) |
+| 7 | Mac Mini M2 at the desk, `mowa` and shared storage |
 | 8 | Spare |
 
 **Seven of eight, with one spare. Eight ports is the right size for the rack.**
+
+### WiFi for the Mac Mini, considered and rejected
+
+Mesh coverage at the desk is good, and one machine on WiFi would be acceptable for general
+use. It is rejected because of *which* machine it is: the Mac Mini serves shared storage
+for the lab and is the intended target for Home Assistant's off-box backups. **A backup
+target on variable mesh throughput is a poor foundation, particularly for backups that
+have never been restore-tested.** It sits beside the rack, so a cable costs a cable.
 
 ### PoE belongs on the room switch, not this one
 
@@ -57,22 +80,26 @@ for the rack on the strength of it.
 
 Nothing in the rack takes power over Ethernet. The machines there have their own supplies.
 
-### The daisy chain is the more interesting problem
+### The daisy chain is the more interesting problem, and retiring the desk switch solves it
 
-It is worth stating plainly, because it costs more than the choice of switch model:
+The current order is worth stating plainly, because it costs more than the choice of
+switch model:
 
 - **All rack traffic shares one gigabit link through the desk switch.** Cluster traffic and
   storage traffic to the Mac Mini both cross it. The rack is the densest part of the
   network and it sits behind the thinnest link.
-- **The desk is now a dependency of the rack.** Unplugging something at the desk, or
-  knocking the switch's power out, takes the rack with it. A desk is a place where cables
-  get moved.
+- **The desk is a dependency of the rack.** Unplugging something at the desk, or knocking
+  the switch's power out, takes the rack with it. A desk is a place where cables get moved.
 - **Three unmanaged hops** make any future VLAN work harder, because every hop has to pass
   tagged traffic.
 
-**Moving the rack switch to hang directly off the room 8-port, in parallel with the desk
-rather than behind it, costs one cable and no money.** That is a bigger improvement than
-any switch on the shortlist.
+**Retiring the desk switch fixes all three at once**, and it follows from the target layout
+rather than being a separate project: the rack connects straight to the cabinet, and the
+Mac Mini connects to the rack. Two hops instead of three, and the failure path no longer
+runs through a desk.
+
+Reversing the order instead — rack first, desk behind it — would fix the dependency
+direction but keep the extra hop and the extra box, for one device.
 
 ### Managed or not
 
@@ -90,8 +117,9 @@ the only real argument against the plain unmanaged unit.
 **Buy a TP-Link TL-SG108E for the rack: 8 gigabit ports, Easy Smart, no PoE. Roughly €25
 to €35.**
 
-**And re-cable the rack to hang off the room 8-port directly, rather than behind the desk
-switch.** The re-cabling matters more than the model choice and costs one cable.
+**Re-cable the rack to hang off the cabinet 8-port directly, and retire the desk switch.**
+The Mac Mini takes a cable from the rack. The cabling matters more than the model choice
+and costs one cable.
 
 Three reasons:
 
@@ -141,7 +169,9 @@ come from somewhere. Replacing it is the reason this ADR exists.
 - Correct size, with one spare port, at a cost close to Mauro's original proposal
 - VLANs available in front of the cluster when the learning work needs them
 - Same vendor and management model as the existing switches
-- The re-cabling removes the desk from the rack's failure path at no cost
+- The re-cabling removes the desk from the rack's failure path at no cost, and drops the
+  chain from three unmanaged hops to two
+- One less box and one less power supply at the desk, and a spare 5-port switch
 
 ### Negative and accepted trade-offs
 
@@ -156,11 +186,12 @@ come from somewhere. Replacing it is the reason this ADR exists.
 
 ### Open questions
 
-1. **Is the Mac Mini in the rack, or at the desk?** It changes the count from seven to six.
-2. **Can the rack be re-cabled to the room switch directly**, or is the run to the desk
-   the only physical path available?
-3. **Where would camera runs terminate?** Assumed to be the room switch. If they would
+1. **Can the rack be re-cabled to the cabinet directly**, or is the existing run the only
+   physical path available? The port count holds either way; only the hop count changes.
+2. **Where would camera runs terminate?** Assumed to be the cabinet switch. If they would
    come to the rack instead, this ADR changes and PoE returns to the table.
+3. **What happens to the spare 5-port** once the desk switch is retired? A second
+   Kubernetes segment and a cold spare are both reasonable. Not decided here.
 
 **Prices are indicative, from August 2026 listings, and were not verified at a Belgian
 retailer.** Confirm locally before ordering.
