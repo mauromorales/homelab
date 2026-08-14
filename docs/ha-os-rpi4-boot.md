@@ -123,6 +123,20 @@ GPIO 14 and 15 are **not** physical pins 14 and 15. The header positions are:
 
 Three wires, with TX and RX crossed over.
 
+A four-wire USB-TTL cable of the common PL2303 or CP2102 type maps like this:
+
+| Cable colour | Signal | Physical pin |
+|---|---|---|
+| Black | GND | 6 |
+| White | adapter RX | 8 |
+| Green | adapter TX | 10 |
+| Red | 5V | **none — leave disconnected** |
+
+**Colours are a convention, not a standard.** If the adapter carries silkscreen
+labels, trust the labels. If the console stays silent while the board boots normally,
+swap white and green: some cables label TX and RX from the opposite end, and swapping
+them is harmless.
+
 **Leave the adapter's power lead disconnected.** The Pi has its own supply, and
 back-feeding 5V into the header is a common way to destroy a board. **Check the adapter
 is set to 3.3V logic** — most CP2102, CH340 and FT232 boards carry a jumper for this, and
