@@ -179,6 +179,85 @@ enabled.
   -110`, are cosmetic. They cost about 10 seconds before U-Boot reaches the SSD. An empty
   or flaky SD slot is the likely cause; removing the card is the test. Slow is not broken.
 
+## When Core will not start: `exec /init: exec format error`
+
+This one cost a day, and every plausible explanation for it was wrong except the last.
+
+**Symptom.** The Supervisor is healthy on port 4357. The landing page briefly serves port
+8123, announces itself over mDNS as "preparing setup", then stops. After that nothing
+listens on 8123 at all. The Supervisor log ends with:
+
+```
+Starting Home Assistant ghcr.io/home-assistant/raspberrypi4-64-homeassistant with version 2026.8.1
+Home Assistant has crashed!
+```
+
+and the console shows `exec /init: exec format error`, repeating as the Supervisor
+retries.
+
+**What it is not.** Four hypotheses, all reasonable, all wrong, and each one is worth a
+line so nobody spends the day re-testing them:
+
+| Hypothesis | How it was killed |
+|---|---|
+| Wrong image name pinned by a reused data partition | The log names `raspberrypi4-64-homeassistant`, the correct 64-bit image |
+| Wrong CPU architecture | `uname -m` is `aarch64`; `docker image inspect` reports `"Architecture": "arm64"` |
+| Old HA OS or old container runtime | HA OS 18.2 with `version_latest: 18.2`, Docker 29.6.2, containerd 2.2.6 |
+| Home Assistant misconfiguration | `docker run` on the image fails identically **outside** the Supervisor |
+
+**What it was: `/init` inside the image was a zero-byte file.** An empty file is neither
+ELF nor a script with a `#!` line, so the kernel refuses it with `ENOEXEC`, which surfaces
+as "exec format error". The entrypoint was missing, not incompatible.
+
+### The check that finds it in one command
+
+```
+docker cp $(docker create <image>):/init /tmp/init
+ls -l /tmp/init
+```
+
+`docker cp` reports the size as it copies, so even the copy line gives it away:
+`Successfully copied 0B` is the whole diagnosis. **Check the size before reasoning about
+the format.** "Exec format error" pulls attention towards architecture, and an empty file
+produces the same message.
+
+### Why it happened, and it is the same lesson twice
+
+A zero-length file with correct metadata is the signature of ext4 delayed allocation
+losing its data on an unclean shutdown: the name is created, the contents never reach the
+disk. This board had been hard power-cycled repeatedly, because the dark HDMI console
+gave no other way to test it — and the first boot's 626 MB Core download and unpack
+landed inside that window.
+
+**So the display fault caused the container fault.** The tests that could not tell broken
+from invisible were the same tests that demanded pulling the plug. Use `ha host shutdown`
+or `ha host reboot` once there is any working console.
+
+### Why re-pulling the image does not fix it
+
+`docker pull` skips layers it believes it already has. The store is content-addressed and
+Docker trusts its own recorded digests rather than re-reading the local files, so a layer
+whose bytes were emptied still looks present and valid. **An instant pull of a 626 MB
+image is the symptom, not a success.**
+
+`docker rmi -f` alone is not enough either, because the Supervisor's stopped
+`homeassistant` container still references those layers. Remove the referrer first:
+
+```
+docker rm -f homeassistant
+docker rmi -f <image>
+docker pull <image>
+docker run --rm --entrypoint /bin/ls <image> -l /init
+```
+
+A slow download is the sign it really refetched. The final line must show a non-zero
+size.
+
+**Prefer a reinstall to repair when nothing has been configured yet.** If Core has never
+started there is no configuration, no history and no backup to preserve, so the value of
+identifying which write was lost is zero. Reflash, put the SSD on a USB 3 port, boot once,
+and leave it alone for twenty minutes.
+
 ## Storage notes
 
 - **Boot from the USB SSD, never an SD card.** The recorder writes continuously and will
