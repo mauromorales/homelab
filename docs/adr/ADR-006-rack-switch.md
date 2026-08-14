@@ -324,9 +324,20 @@ is gone.
 | bol.com BE | €84.00 | Third-party seller, four-day delivery |
 
 **All three are online with delivery. No shelf stock in Ghent was confirmed.** Krefel's
-site returned a server error and Coolblue blocks automated requests, so neither was
-checked; Coolblue has a Ghent store and is worth a phone call if the switch is wanted the
-same day.
+site returned a server error and was not checked.
+
+**Coolblue was checked and does not stock either Easy Smart model.** Its whole 16-port
+TP-Link range is the two extremes, both delivered Monday rather than next day:
+
+| Model | Price | Why not |
+|---|---|---|
+| TL-SG116 | €60 | Unmanaged. Their own listing says "None managed switch". This is the trap below |
+| TL-SG1016PE | €138 | Managed and 16 ports, but €63 of it is PoE at the wrong end of the house |
+| SG2016P / SG2218P | €202 / €259 | Omada tier, far past what the rack justifies |
+
+Worth noting for the PoE question specifically: **buying the PoE model for the rack would
+not bring the camera decision forward at all**, because camera runs terminate at the power
+cabinet. It would be PoE in the one place no camera can reach.
 
 Prices for the alternatives above are from August 2026 listings and are indicative rather
 than checked.
