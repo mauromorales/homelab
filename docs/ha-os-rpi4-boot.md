@@ -1,0 +1,273 @@
+# Runbook: diagnosing a Home Assistant OS boot on the Raspberry Pi 4
+
+Host: the spare Raspberry Pi 4 chosen in [ADR-005](adr/ADR-005-home-assistant-host.md),
+running Home Assistant OS from a USB SSD.
+
+This runbook exists because a board that was booting perfectly looked dead for several
+hours. Four pieces of hardware were swapped before the real cause turned up, and none of
+those swaps could have found it. The fix is worth a paragraph. The reason the swaps were
+wasted is worth the rest of the page.
+
+## The rule this runbook is really about
+
+**Before you call something broken, say what your evidence would look like if the thing
+were merely invisible. If the answer is "exactly the same", the test is worthless — find
+another test.**
+
+That is the general form. The specific form here: a display that goes dark and a machine
+that stops booting produce an identical screen. Every experiment that only looks at the
+screen is blind to the difference, no matter how many parts it replaces.
+
+The corollary is the one that ended it:
+
+**Timing that repeats across changed hardware is a software event.** Hardware faults —
+marginal power, a flaky cable, a dying port — vary. Software reaches the same instruction
+at the same moment every time. So when the same event lands within a few hundred
+milliseconds across four different hardware configurations, hardware is already ruled
+out, and no further swap will tell you anything.
+
+## The case
+
+**Symptom.** HDMI console output stopped about 4.5 seconds into the kernel boot. The
+screen then showed NO SIGNAL, and nothing further appeared.
+
+**What was swapped, none of it necessary:** the power supply, a powered USB hub, the SSD
+between USB ports, and the keyboard.
+
+**The evidence that settled it.**
+
+- The cutoff landed at kernel time 4.4027s, 4.7080s, 4.6497s and 4.4972s across the four
+  configurations — a spread of roughly 300 ms. Deterministic, therefore software.
+- `[drm] Initialized v3d 1.0.0 for fec00000.v3d` appeared two or three lines before the
+  cutoff in every single run.
+- The U-Boot RAUC counter printed "1 attempts remaining" on the first boot and "2
+  attempts remaining" on every boot after it. That counter only resets when userspace
+  marks the slot good, so pinned at 2 means **every boot had already succeeded**.
+- `Finished File System Check on /dev/disk/by-label/hassos-boot` — clean, no I/O errors.
+- Port 8123 answered with connection refused, **not** with a name resolution failure.
+  mDNS was replying, so the network stack was up. Port 4357 served the observer page.
+
+**Root cause.** `vc4-kms-v3d` takes over the display from the firmware's
+simple-framebuffer at that point in the boot. HDMI is torn down and renegotiated, and the
+HDMI capture card never re-syncs afterwards. The console was gone; the board was not. It
+had booted correctly every time.
+
+## Fast checks, in the order that settles it quickest
+
+1. **Open the observer on port 4357 before you try port 8123.** The observer answers
+   while Home Assistant Core is still starting, so it distinguishes "still booting" from
+   "not running" — but read the next section for what it does *not* tell you.
+2. **Tell NO SIGNAL apart from a frozen console.** NO SIGNAL means the display link
+   dropped, which is a display problem. A console frozen mid-line means the kernel
+   stopped, which is not. They are different failures and they look similar only if you
+   stop looking.
+3. **Read the RAUC attempts counter in U-Boot.** A counter that does not decrease means
+   the previous boot reached userspace and marked its slot good.
+4. **Run `ha os info`** to read the boot slots and confirm which one is active.
+
+Checks 1, 3 and 4 all work with no display at all. That is the point: none of them can be
+fooled by the failure mode that cost the four swaps.
+
+## The observer answers for the Supervisor, not for Core
+
+Port 4357 reporting `Supervisor: Connected, Supported, Healthy` says the Supervisor is
+healthy. It says nothing about Home Assistant Core.
+
+So this combination is a real and specific state:
+
+| Port 4357 | Port 8123 | Meaning |
+|---|---|---|
+| Serves the observer page | Refuses the connection | Supervisor is up, Core is down or still starting |
+| No answer | No answer | The host or the network is the problem, not Core |
+
+Confirmed on this board: the observer returned HTTP 200 and healthy while 8123 refused
+the TCP connection outright — `connect` failing in under a millisecond, not a slow
+response and not an error page. Ports 22 and 80 were closed too, which is normal for
+stock HA OS without the SSH add-on.
+
+**Diagnose that as a Core or container question. It is not a networking question.** If
+the box answers on 4357 at all, then mDNS, the LAN, the cable and the addressing are all
+working, and re-checking them is another test with no discriminating power.
+
+To check the host itself is reachable, `ping homeassistant.local` and read the TTL: TTL 64
+with sub-millisecond round trips means the host is on the same subnet with no router hop.
+
+## Restoring the HDMI console
+
+### Plug in a real monitor. That is the whole fix.
+
+**Confirmed on this board, 2026-08-14.** The same Pi, on the same cable and the same
+boot, shows the full console on a normal monitor and dies at the handover on an Elgato
+HDMI capture card. Nothing on the Pi needed changing.
+
+**The faulty component was on the far end of the cable.** Every one of the four hardware
+swaps was aimed at the Pi, and the Pi was never the problem. A capture card is a sink
+built for a steady, already-negotiated stream. The `vc4-kms-v3d` handover tears HDMI down
+and renegotiates it, and the card does not follow. A monitor does.
+
+**So the first test for any dark console on this board is: try a monitor before you touch
+the board.** It costs one cable swap and it discriminates immediately — which is exactly
+what the four hardware swaps failed to do.
+
+### If a monitor is not available
+
+Only then, change **one variable at a time**, and record the result before starting the
+next. Three fixes applied together prove nothing about which one worked.
+
+1. Try the other HDMI port — HDMI0, the one nearest the USB-C jack.
+2. In `config.txt` on the `hassos-boot` partition, set `hdmi_group=1`, `hdmi_mode=16`,
+   `hdmi_force_hotplug=1` and `hdmi_drive=2`. This pins a mode the capture card can hold
+   through the handover.
+3. Replace `dtoverlay=vc4-kms-v3d` with `dtoverlay=vc4-fkms-v3d`, which keeps the
+   firmware framebuffer path instead of handing over to full KMS.
+
+These are worth keeping because a capture card is sometimes the only sink available. They
+are no longer the first thing to reach for.
+
+## Set up the serial console first, not last
+
+This should have been step one. A UART console does not go through the display pipeline,
+so it survives exactly the event that broke the HDMI capture, and it prints the boot from
+U-Boot onwards. Once it exists, HDMI is never the debugging bottleneck on this board
+again.
+
+### Wiring
+
+GPIO 14 and 15 are **not** physical pins 14 and 15. The header positions are:
+
+| Signal | GPIO | Physical pin | Adapter side |
+|---|---|---|---|
+| TXD | GPIO 14 | 8 | RX |
+| RXD | GPIO 15 | 10 | TX |
+| Ground | — | 6 | GND |
+
+Three wires, with TX and RX crossed over.
+
+A four-wire USB-TTL cable of the common PL2303 or CP2102 type maps like this:
+
+| Cable colour | Signal | Physical pin |
+|---|---|---|
+| Black | GND | 6 |
+| White | adapter RX | 8 |
+| Green | adapter TX | 10 |
+| Red | 5V | **none — leave disconnected** |
+
+**Colours are a convention, not a standard.** If the adapter carries silkscreen
+labels, trust the labels. If the console stays silent while the board boots normally,
+swap white and green: some cables label TX and RX from the opposite end, and swapping
+them is harmless.
+
+**Leave the adapter's power lead disconnected.** The Pi has its own supply, and
+back-feeding 5V into the header is a common way to destroy a board. **Check the adapter
+is set to 3.3V logic** — most CP2102, CH340 and FT232 boards carry a jumper for this, and
+5V on pin 10 can damage the Pi's input.
+
+### Reading it
+
+`screen /dev/ttyUSB0 115200`, or `picocom -b 115200 /dev/ttyUSB0`. 8N1, no flow control.
+
+If nothing appears through a full reboot, the console is not enabled in firmware. Add
+`enable_uart=1` to `config.txt` on the `hassos-boot` partition, which needs the SSD
+mounted on another machine. Try the adapter before doing that edit — it may already be
+enabled.
+
+## Known noise — do not chase these
+
+- **`F2FS-fs (sda3): Magic Mismatch`** is benign. `sda3` is the erofs system slot; the
+  kernel simply probes F2FS before it gets to erofs.
+- **U-Boot `mmc0`/`mmc1` timeouts**, printing `Card did not respond to voltage select! :
+  -110`, are cosmetic. They cost about 10 seconds before U-Boot reaches the SSD. An empty
+  or flaky SD slot is the likely cause; removing the card is the test. Slow is not broken.
+
+## When Core will not start: `exec /init: exec format error`
+
+This one cost a day, and every plausible explanation for it was wrong except the last.
+
+**Symptom.** The Supervisor is healthy on port 4357. The landing page briefly serves port
+8123, announces itself over mDNS as "preparing setup", then stops. After that nothing
+listens on 8123 at all. The Supervisor log ends with:
+
+```
+Starting Home Assistant ghcr.io/home-assistant/raspberrypi4-64-homeassistant with version 2026.8.1
+Home Assistant has crashed!
+```
+
+and the console shows `exec /init: exec format error`, repeating as the Supervisor
+retries.
+
+**What it is not.** Four hypotheses, all reasonable, all wrong, and each one is worth a
+line so nobody spends the day re-testing them:
+
+| Hypothesis | How it was killed |
+|---|---|
+| Wrong image name pinned by a reused data partition | The log names `raspberrypi4-64-homeassistant`, the correct 64-bit image |
+| Wrong CPU architecture | `uname -m` is `aarch64`; `docker image inspect` reports `"Architecture": "arm64"` |
+| Old HA OS or old container runtime | HA OS 18.2 with `version_latest: 18.2`, Docker 29.6.2, containerd 2.2.6 |
+| Home Assistant misconfiguration | `docker run` on the image fails identically **outside** the Supervisor |
+
+**What it was: `/init` inside the image was a zero-byte file.** An empty file is neither
+ELF nor a script with a `#!` line, so the kernel refuses it with `ENOEXEC`, which surfaces
+as "exec format error". The entrypoint was missing, not incompatible.
+
+### The check that finds it in one command
+
+```
+docker cp $(docker create <image>):/init /tmp/init
+ls -l /tmp/init
+```
+
+`docker cp` reports the size as it copies, so even the copy line gives it away:
+`Successfully copied 0B` is the whole diagnosis. **Check the size before reasoning about
+the format.** "Exec format error" pulls attention towards architecture, and an empty file
+produces the same message.
+
+### Why it happened, and it is the same lesson twice
+
+A zero-length file with correct metadata is the signature of ext4 delayed allocation
+losing its data on an unclean shutdown: the name is created, the contents never reach the
+disk. This board had been hard power-cycled repeatedly, because the dark HDMI console
+gave no other way to test it — and the first boot's 626 MB Core download and unpack
+landed inside that window.
+
+**So the display fault caused the container fault.** The tests that could not tell broken
+from invisible were the same tests that demanded pulling the plug. Use `ha host shutdown`
+or `ha host reboot` once there is any working console.
+
+### Why re-pulling the image does not fix it
+
+`docker pull` skips layers it believes it already has. The store is content-addressed and
+Docker trusts its own recorded digests rather than re-reading the local files, so a layer
+whose bytes were emptied still looks present and valid. **An instant pull of a 626 MB
+image is the symptom, not a success.**
+
+`docker rmi -f` alone is not enough either, because the Supervisor's stopped
+`homeassistant` container still references those layers. Remove the referrer first:
+
+```
+docker rm -f homeassistant
+docker rmi -f <image>
+docker pull <image>
+docker run --rm --entrypoint /bin/ls <image> -l /init
+```
+
+A slow download is the sign it really refetched. The final line must show a non-zero
+size.
+
+**Prefer a reinstall to repair when nothing has been configured yet.** If Core has never
+started there is no configuration, no history and no backup to preserve, so the value of
+identifying which write was lost is zero. Reflash, put the SSD on a USB 3 port, boot once,
+and leave it alone for twenty minutes.
+
+## Storage notes
+
+- **Boot from the USB SSD, never an SD card.** The recorder writes continuously and will
+  wear an SD card out. This is the most common cause of Pi-hosted Home Assistant failure,
+  and it is why [ADR-005](adr/ADR-005-home-assistant-host.md) specifies SSD boot.
+- **Check the SSD is on a USB 3 port and negotiates SuperSpeed.** On this board it was
+  found behind a VIA Labs USB 2.0 hub (`2109:3431`) running at 480 Mbps, which loses USB
+  3 entirely. Read the negotiated link speed from `dmesg` rather than trusting the port
+  it looks plugged into.
+- **Leave UAS enabled.** `scsi host0: uas` is active on the SanDisk drive (`0781:5580`)
+  with no I/O errors. **Only if real I/O errors appear**, disable it with
+  `usb-storage.quirks=0781:5580:u` in `cmdline.txt` — and note that this costs
+  throughput, so it is a fix for a proven problem, not a precaution.

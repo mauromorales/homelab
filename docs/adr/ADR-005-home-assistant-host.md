@@ -182,6 +182,45 @@ Pi 5 available.
   ADR-004 keeps fire alarm interlink out of the platform entirely
 - Kubernetes experience deferred to a later workload rather than gained immediately
 
+### Amendment, 2026-08-14 — the accepted cost arrived on day one
+
+**The decision stands. What changes is that one line of the ledger is now a measurement
+rather than an estimate.**
+
+The first installation on this host never reached a running Home Assistant. The
+Supervisor came up healthy, the landing page served the "preparing setup" placeholder,
+and then the Core container failed to start with `exec /init: exec format error` and
+never listened on port 8123. Full diagnosis in
+[`docs/ha-os-rpi4-boot.md`](../ha-os-rpi4-boot.md).
+
+Two costs showed up immediately, and both were foreseeable from the reasoning above:
+
+**"Boring by design" is a property of a working appliance, not of an appliance.** The
+argument for this host was that a rarely-touched box matches a small, slow-moving device
+list. That holds once it runs. It says nothing about the first boot, and the first boot
+is where an appliance is least boring, because it is the moment with the most unknowns
+and the fewest tools.
+
+**The debugging surface was four tools, not one.** Reaching the actual error meant
+`ha core logs`, then `ha supervisor logs`, then `login` to a host shell, then
+`docker image inspect` and `docker run`. The layer holding the answer was the container
+runtime — precisely the layer the appliance model exists to keep out of sight. The
+Supervisor's own report of the failure was `Error: Unknown error, see Supervisor logs`.
+
+**This is not evidence for the rejected alternative, and it should not be read as
+such.** The same image would fail the same way under Kubernetes; an ENOEXEC on a
+container entrypoint is indifferent to what schedules it. What Kubernetes would have
+given is a *uniform* path to the error — `kubectl logs`, `kubectl describe`, the same two
+commands used on every other workload — rather than a bespoke one. So the honest form of
+this amendment is narrow: the cluster route was rejected on workload mismatch, add-on
+loss, availability coupling and networking friction, and none of those four reasons is
+weakened by this incident. What the incident weakens is the implicit assumption that the
+appliance route costs less *operator attention*. On day one it cost more.
+
+**No action follows from this amendment.** It is recorded because a decision log that
+only holds predictions is worth less than one that holds outcomes, and because the
+month-6 report should show a trade-off being paid, not only being chosen.
+
 ### Reversibility
 
 **This is not a one-way door.** Migrating onto Kubernetes later is a backup and

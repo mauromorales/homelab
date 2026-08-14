@@ -59,6 +59,16 @@ Non-obvious, long-lived decisions are captured as ADRs in `docs/adr/`
 Consequences). Check here before revisiting a settled choice, and add a new ADR
 when making one.
 
+## Runbooks (`docs/*.md`)
+
+Operational procedures live as flat files in `docs/`, next to the `adr/`
+directory. A runbook records how to diagnose or perform something on real
+hardware; an ADR records why a choice was made. Existing runbooks:
+
+- [`docs/ha-os-rpi4-boot.md`](docs/ha-os-rpi4-boot.md) — diagnosing a Home
+  Assistant OS boot on the Raspberry Pi 4, and the display-handover failure
+  that makes a healthy board look dead.
+
 ## Build pipeline (all builds happen in GitHub Actions)
 
 Every node is a **two-stage build**:
