@@ -190,7 +190,7 @@ the only real argument against the plain unmanaged unit.
 ## Decision
 
 **Buy a TP-Link TL-SG1016DE for the rack: 16 gigabit ports, Easy Smart, no PoE,
-19-inch rack-mountable. Roughly €70 to €80.**
+19-inch rack-mountable. €74.99 at MediaMarkt.be, checked 2026-08-14.**
 
 **Re-cable the rack to hang off the cabinet 8-port directly, and retire the desk switch.**
 The Mac Mini takes a cable from the rack. The cabling matters more than the model choice
@@ -295,5 +295,18 @@ is gone.
 4. **Where does shared storage live?** Undecided, and it deserves its own ADR. It is out of
    scope here, but it could add a device to the rack and therefore claim the spare port.
 
-**Prices are indicative, from August 2026 listings, and were not verified at a Belgian
-retailer.** Confirm locally before ordering.
+### Prices, checked at Belgian retailers on 2026-08-14
+
+| Retailer | Price | Availability |
+|---|---|---|
+| MediaMarkt.be | **€74.99** | Online in stock, next-day if ordered before 23:30 |
+| Alternate.be | €79.90 | In stock |
+| bol.com BE | €84.00 | Third-party seller, four-day delivery |
+
+**All three are online with delivery. No shelf stock in Ghent was confirmed.** Krefel's
+site returned a server error and Coolblue blocks automated requests, so neither was
+checked; Coolblue has a Ghent store and is worth a phone call if the switch is wanted the
+same day.
+
+Prices for the alternatives above are from August 2026 listings and are indicative rather
+than checked.
