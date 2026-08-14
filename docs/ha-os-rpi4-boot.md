@@ -106,13 +106,36 @@ fixes applied together prove nothing about which one worked.
 
 ## Set up the serial console first, not last
 
-Add `enable_uart=1` to `config.txt` and attach a USB-TTL adapter to GPIO 14 and 15 at
-115200 baud.
-
 This should have been step one. A UART console does not go through the display pipeline,
 so it survives exactly the event that broke the HDMI capture, and it prints the boot from
 U-Boot onwards. Once it exists, HDMI is never the debugging bottleneck on this board
 again.
+
+### Wiring
+
+GPIO 14 and 15 are **not** physical pins 14 and 15. The header positions are:
+
+| Signal | GPIO | Physical pin | Adapter side |
+|---|---|---|---|
+| TXD | GPIO 14 | 8 | RX |
+| RXD | GPIO 15 | 10 | TX |
+| Ground | — | 6 | GND |
+
+Three wires, with TX and RX crossed over.
+
+**Leave the adapter's power lead disconnected.** The Pi has its own supply, and
+back-feeding 5V into the header is a common way to destroy a board. **Check the adapter
+is set to 3.3V logic** — most CP2102, CH340 and FT232 boards carry a jumper for this, and
+5V on pin 10 can damage the Pi's input.
+
+### Reading it
+
+`screen /dev/ttyUSB0 115200`, or `picocom -b 115200 /dev/ttyUSB0`. 8N1, no flow control.
+
+If nothing appears through a full reboot, the console is not enabled in firmware. Add
+`enable_uart=1` to `config.txt` on the `hassos-boot` partition, which needs the SSD
+mounted on another machine. Try the adapter before doing that edit — it may already be
+enabled.
 
 ## Known noise — do not chase these
 
