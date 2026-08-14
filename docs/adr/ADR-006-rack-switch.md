@@ -34,6 +34,23 @@ Mauro's stated goal for where things live:
 The desk and the rack are physically next to each other, so the order of the two switches
 in the chain is a free choice rather than a constraint.
 
+```
+router → Deco → 8-port, no PoE ─┬─ thuroros (doorbell)
+                (power cabinet) ├─ … the rooms
+                                │
+                                └─ 8-port, NEW (rack) ─┬─ midnight
+                                                       ├─ HP ProDesk (control plane)
+                                                       ├─ new worker
+                                                       ├─ Home Assistant Pi
+                                                       ├─ polaris (mowa)
+                                                       ├─ 5-port (Kubernetes segment)
+                                                       └─ spare, or stardust
+
+stardust (desk) → WiFi, or a cable to the rack's spare port
+```
+
+The desk switch is gone, and the chain is two hops deep instead of three.
+
 ### What is being proposed
 
 Replace the rack's 5-port with an 8-port, and move the freed 5-port to a dedicated
