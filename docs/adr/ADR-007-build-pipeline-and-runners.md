@@ -29,6 +29,9 @@ is the user path**, and the GitHub-hosted pipeline hides every problem that path
 found by running the factory locally are upstream tickets, which is the point of the
 experiment rather than a side effect.
 
+**Note that this motivation is about building locally, not about where CI runs.** The
+Decision section separates the two, and that separation is the substance of this ADR.
+
 There is a further ambition attached: a build pipeline that is GitOps-shaped and
 Kubernetes-native, rather than a hosted CI product.
 
@@ -136,14 +139,15 @@ Two things to know before it is attempted:
 broken** — the same condition [ADR-005](ADR-005-home-assistant-host.md) set for moving
 Home Assistant onto it.
 
-### Build locally with scripts and no CI at all — rejected
+### Replacing CI with local scripts — rejected
 
-The simplest form of "build locally", and it removes more than it saves: no per-pull-request
-validation, and no signal when a Dependabot bump breaks a base image. It replaces a
-pipeline with remembering to run one.
+*Replacing* is the word doing the work. Building by hand as a dogfooding exercise is the
+decision above; making it the only way images get built is a different proposal, and it
+removes more than it saves: no per-pull-request validation, and no signal when a Dependabot
+bump breaks a base image. It swaps a pipeline for remembering to run one.
 
-**Self-hosted runners keep the pipeline and move only the compute**, which is the part
-worth moving.
+**Build locally to learn what the local path costs. Keep CI to catch regressions.** The two
+are not in competition.
 
 ## Consequences
 
