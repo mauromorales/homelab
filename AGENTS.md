@@ -49,21 +49,29 @@ by removing that line (see the note at the top of the file).
 Fedora as scaffolding and targets a Kairos Ubuntu 24.04 image later; its README
 documents hardware, BIOS/boot-order, Wake-on-LAN, and PXE/fTPM specifics for
 that migration. When building its image, follow the standard two-file node shape
-above. The decision to base it on Kairos Ubuntu 24.04 is recorded in
-[`docs/adr/ADR-001`](docs/adr/ADR-001-agent-host-os.md).
+above. The decision to base it on Kairos Ubuntu 24.04 is recorded in homelab
+ADR-001, which now lives in the private steering repository (see below).
 
-## Architecture decisions (`docs/adr/`)
+## Architecture decisions are NOT in this repository
 
-Non-obvious, long-lived decisions are captured as ADRs in `docs/adr/`
-(`ADR-NNN-<slug>.md`, with Date/Status/Deciders + Context/Decision/Alternatives/
-Consequences). Check here before revisiting a settled choice, and add a new ADR
-when making one.
+`docs/adr/` used to hold them. It is gone. **Every ADR for this lab now lives in
+Mauro's private steering repository, under `docs/adr/homelab/`.** The file names
+did not change.
+
+The reason: this repository is public, and the ADRs had grown to describe the
+network layout, the machines in the rack and the household devices. Moving them
+was chosen over making this repository private, which would have started billing
+GitHub Actions minutes. Decided 2026-08-14.
+
+**Check there before revisiting a settled choice, and add new ADRs there.** Do
+not recreate `docs/adr/` here.
 
 ## Runbooks (`docs/*.md`)
 
-Operational procedures live as flat files in `docs/`, next to the `adr/`
-directory. A runbook records how to diagnose or perform something on real
-hardware; an ADR records why a choice was made. Existing runbooks:
+Operational procedures live as flat files in `docs/`, and they **did not move**.
+A runbook records how to diagnose or perform something on real hardware, and it
+belongs beside the thing it operates. An ADR records why a choice was made.
+Existing runbooks:
 
 - [`docs/ha-os-rpi4-boot.md`](docs/ha-os-rpi4-boot.md) — diagnosing a Home
   Assistant OS boot on the Raspberry Pi 4, and the display-handover failure

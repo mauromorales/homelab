@@ -1,6 +1,6 @@
 # midnight — Beelink SER5 (agent host)
 
-Status: active. Interim OS: Fedora (scaffolding). Target OS: Kairos Ubuntu 24.04 LTS flavor (see [ADR-001](../../docs/adr/ADR-001-agent-host-os.md)), later Hadron.
+Status: active. Interim OS: Fedora (scaffolding). Target OS: Kairos Ubuntu 24.04 LTS flavor (see homelab ADR-001, in the private steering repository), later Hadron.
 Role: always-on agent host for a 6-month agentic development experiment.
 Last updated: 2026-07-19.
 
