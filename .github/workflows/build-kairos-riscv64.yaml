@@ -54,15 +54,10 @@ jobs:
             echo "value=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build base image
-        uses: docker/build-push-action@v6
-        with:
-          platforms: linux/riscv64
-          file: nodes/kairos-riscv64/Dockerfile
-          context: nodes/kairos-riscv64
-          tags: kairos-riscv64:base
-          load: true
-
+      # kairos.Dockerfile is self-contained (base packages inlined, see the
+      # comment in that file for why) -- no separate base-image step, and no
+      # local-image handoff between build-push-action calls for buildx's
+      # docker-container builder to fail to resolve.
       - name: Kairosify
         uses: docker/build-push-action@v6
         with:
@@ -70,7 +65,6 @@ jobs:
           file: nodes/kairos-riscv64/kairos.Dockerfile
           context: nodes/kairos-riscv64
           build-args: |
-            BASE_IMAGE=kairos-riscv64:base
             VERSION=${{ steps.version.outputs.value }}
           tags: kairos-riscv64:kairos
           load: true
