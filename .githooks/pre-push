@@ -1,0 +1,18 @@
+#!/bin/sh
+# Blocks pushing commits directly onto protected branches (see CLAUDE.md: "never commit to main directly").
+# Catches cases pre-commit can't: merges, cherry-picks, or commits made with --no-verify.
+protected_branches="main master"
+remote="$1"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  branch=$(echo "$remote_ref" | sed -n 's#^refs/heads/##p')
+  for protected in $protected_branches; do
+    if [ "$branch" = "$protected" ]; then
+      echo "error: direct push to '$protected' on '$remote' is not allowed." >&2
+      echo "       open a pull request instead." >&2
+      exit 1
+    fi
+  done
+done
+
+exit 0
