@@ -2,9 +2,11 @@
 
 Special-purpose OS for the **doorbell relay**. A Raspberry Pi 4 (`thuroros`)
 watches a physical doorbell button and, when it is pressed, notifies my phone.
-The Pi has no notification capability of its own — it hands the message to
+The Pi has no notification capability of its own: it hands the message to
 [mowa](https://github.com/mauromorales/mowa) running on the Mac (`polaris`),
-which relays it through Apple Messages / iMessage.
+which relays it through Apple Messages / iMessage, and it publishes the same
+event to Home Assistant over MQTT (see below), for a local push notification
+and a real entity with history.
 
 ## Architecture
 
@@ -22,6 +24,7 @@ flowchart LR
     end
 
     doorbell -->|"POST /api/messages<br/>{to, message}"| mowa
+    doorbell -->|"MQTT publish<br/>thuroros/doorbell/state"| ha
 
     subgraph polaris["polaris · Mac (macOS)"]
         mowa["mowa :8080<br/>(Go, launchd)"]
@@ -29,11 +32,20 @@ flowchart LR
         mowa -->|osascript / AppleScript| messages
     end
 
+    subgraph haHost["homeassistant · Raspberry Pi 4 (HA OS)"]
+        ha["Mosquitto broker<br/>+ Home Assistant"]
+        entity["event.* (doorbell)"]
+        ha -->|MQTT discovery| entity
+        entity -->|automation| push["notify.mobile_app_*"]
+    end
+
     messages -->|iMessage| phone([My phone])
+    push -->|Local Push, WebSocket| phone
 ```
 
-Both hosts advertise on the LAN over mDNS (avahi / Bonjour), so `thuroros`
-reaches mowa at `polaris.local` — no static IPs.
+All three hosts advertise on the LAN over mDNS (avahi / Bonjour), so `thuroros`
+reaches mowa at `polaris.local` and Home Assistant at `homeassistant.local`:
+no static IPs.
 
 ## The two nodes
 
@@ -47,7 +59,9 @@ services:
   press it reads the current recipient and message from the config file and
   `POST`s them to mowa. It checks the per-recipient `results[].success` in
   mowa's response, and bounds the request with a `(3.05s, 10s)` timeout so a
-  stuck relay can't freeze the button handler.
+  stuck relay can't freeze the button handler. It also publishes the press to
+  Home Assistant over MQTT (see below), independently: a broker outage cannot
+  affect the iMessage path, and a Messages wedge cannot affect MQTT.
 - **`doorbell-web`** — a tiny stdlib HTTP server on `:8080` serving a config
   page at `http://thuroros.local:8080/doorbell`. It lets me switch the recipient
   between the `admin` and `family` groups and change the message text without
@@ -75,7 +89,32 @@ each via `osascript` → AppleScript → Messages.app → iMessage.
 
 End to end this is typically **~0.4s**: GPIO detect ≤0.1s, mowa + AppleScript
 ~0.18s, iMessage delivery ~0.18s. Overall latency is bounded by iMessage, not by
-this pipeline — the local hops are sub-second.
+this pipeline: the local hops are sub-second.
+
+## Home Assistant (MQTT)
+
+On every press, `doorbell` also publishes to the Mosquitto broker on the
+`homeassistant` Pi, independently of the mowa/iMessage path above:
+
+- **Once, retained, at service start**, a discovery message to
+  `homeassistant/event/thuroros_doorbell/config`. Home Assistant reads this and
+  creates the doorbell's `event.*` entity automatically: no manual entity setup
+  on the HA side. (Exact `entity_id` is HA's to assign; check it once this is
+  live rather than assuming the name here.)
+- **On every press**, `{"event_type": "pressed", "message": <text>}` to
+  `thuroros/doorbell/state`. Each press shows up in Home Assistant's Logbook and
+  History like any other entity state change.
+
+An HA automation triggers on that entity and calls `notify.mobile_app_*` for the
+push. That automation lives in Home Assistant's own config, not in this
+repository. Today it's set to **Local Push** only (WebSocket, free, works while
+the phone is on the same Wi-Fi as Home Assistant); remote (away from home) push
+would need Nabu Casa or a VPN back into the LAN, deliberately not set up yet.
+
+**MQTT credentials, if the broker needs them, are never in this file.** They're
+optional fields (`mqtt_user`, `mqtt_password`) in the same persisted
+`config.json` described below, set by hand on the device, not via
+`doorbell-web` or git. `homelab` is public.
 
 ## Configuration
 
@@ -86,16 +125,23 @@ this pipeline — the local hops are sub-second.
 ```
 
 - **`to`** — `admin` or `family` (must match a group defined in mowa).
-- **`message`** — the notification text; defaults to the doorbell message.
+- **`message`** — the notification text; defaults to the doorbell message. Also
+  carried as an attribute on the Home Assistant event.
+- **`mqtt_user`** / **`mqtt_password`** (optional): only needed if the Mosquitto
+  broker requires authentication. Unset means an anonymous MQTT connection.
 
-Change either at `http://thuroros.local:8080/doorbell`.
+`to` and `message` change at `http://thuroros.local:8080/doorbell`.
+`mqtt_user`/`mqtt_password` are edited on the device directly (not exposed in
+`doorbell-web` yet).
 
 ## Operational notes
 
 - **Resilience:** mowa relays *synchronously* through the Messages AppleScript
   bridge, which can occasionally wedge (its default AppleEvent timeout is
   ~120s). The doorbell's request timeout keeps such a wedge from freezing the
-  button handler; it logs a timeout and keeps running.
+  button handler; it logs a timeout and keeps running. The MQTT publish has the
+  same shape: a 5s socket timeout, caught and logged, never raised, so a broker
+  outage cannot freeze the button handler either.
 - **Deployment:** changes to `cloud-config.yaml` trigger an image rebuild
   ([`build-thuroros.yaml`](../../.github/workflows/build-thuroros.yaml)); the
   new image is flashed or upgraded onto the Pi. Releases are cut by tagging

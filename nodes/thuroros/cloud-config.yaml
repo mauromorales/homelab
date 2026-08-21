@@ -23,8 +23,16 @@ stages:
             import requests
             import json
             import os
+            import socket
             from datetime import datetime
             import pytz
+            import paho.mqtt.publish as mqtt_publish
+
+            # paho's publish.single() has no explicit connect timeout of its own; it
+            # relies on the socket default, which is unbounded unless set here. A
+            # wedged broker must not be able to freeze the button handler, same as
+            # notify()'s bounded POST below.
+            socket.setdefaulttimeout(5)
 
             # GPIO Setup
             GPIO_PIN = 23
@@ -38,6 +46,28 @@ stages:
             DEFAULT_MESSAGE = "🔔 Someone is at the door 🚪"
             ALLOWED_RECIPIENTS = ["admin", "family"]
 
+            # Home Assistant, via MQTT discovery. mqtt_user/mqtt_password are optional
+            # and read from CONFIG_PATH -- never from this file, which is public git
+            # history. Unset means an anonymous connection attempt; if the broker
+            # requires auth and none is configured, publishing just fails and is
+            # logged, the same as any other MQTT outage.
+            MQTT_HOST = "homeassistant.local"
+            MQTT_DISCOVERY_TOPIC = "homeassistant/event/thuroros_doorbell/config"
+            MQTT_STATE_TOPIC = "thuroros/doorbell/state"
+            MQTT_DISCOVERY_PAYLOAD = json.dumps({
+                "name": "Doorbell",
+                "unique_id": "thuroros_doorbell",
+                "state_topic": MQTT_STATE_TOPIC,
+                "event_types": ["pressed"],
+                "device_class": "doorbell",
+                "device": {
+                    "identifiers": ["thuroros"],
+                    "name": "ThurorOS",
+                    "model": "Raspberry Pi 4",
+                    "manufacturer": "Raspberry Pi Foundation",
+                },
+            })
+
             def load_config():
                 """Read the current recipient/message, falling back to defaults."""
                 try:
@@ -50,6 +80,39 @@ stages:
                     to = DEFAULT_TO
                 message = cfg.get("message") or DEFAULT_MESSAGE
                 return to, message
+
+            def mqtt_auth():
+                """Optional MQTT credentials, from the same persisted config as
+                to/message. None until someone sets them on the device, which keeps
+                this a safe no-op against a broker that needs auth and has none yet."""
+                try:
+                    with open(CONFIG_PATH) as f:
+                        cfg = json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError, OSError):
+                    return None
+                user = cfg.get("mqtt_user")
+                if not user:
+                    return None
+                return {"username": user, "password": cfg.get("mqtt_password", "")}
+
+            def mqtt_publish_safe(topic, payload, retain=False):
+                """One bounded MQTT publish. Never allowed to affect the iMessage
+                path below -- same resilience shape as notify()'s POST: log and
+                move on, never raise."""
+                try:
+                    mqtt_publish.single(
+                        topic, payload=payload, hostname=MQTT_HOST, retain=retain,
+                        auth=mqtt_auth(),
+                    )
+                except Exception as e:
+                    print(f"⚠️ MQTT publish to {topic} failed: {e}")
+
+            def announce_doorbell_to_ha():
+                """Retained discovery message. Home Assistant creates the doorbell's
+                event entity the moment this lands (exact entity_id is HA's to pick,
+                confirm it once this is live); harmless to repeat on every service
+                start."""
+                mqtt_publish_safe(MQTT_DISCOVERY_TOPIC, MQTT_DISCOVERY_PAYLOAD, retain=True)
 
             def notify(to, message):
                 """Send a doorbell message to mowa which sends it to my phone."""
@@ -101,6 +164,7 @@ stages:
                     print(f"❌ Unexpected error: {e}")
 
             print("🚀 Doorbell monitor started...")
+            announce_doorbell_to_ha()
             while True:
                 if GPIO.gpio_read(h, GPIO_PIN) == 0:  # Button pressed
                     to, message = load_config()
@@ -108,6 +172,7 @@ stages:
                     timestamp = datetime.now(brussels_tz).strftime("%Y-%m-%d %H:%M:%S")
                     print(f"[{timestamp}] {message} -> {to}")
                     notify(to, message)
+                    mqtt_publish_safe(MQTT_STATE_TOPIC, json.dumps({"event_type": "pressed", "message": message}))
                     time.sleep(2)  # Avoid spamming messages
                 time.sleep(0.1)
     - name: "Create doorbell config web UI script"
