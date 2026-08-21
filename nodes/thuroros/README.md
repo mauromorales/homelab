@@ -113,8 +113,9 @@ would need Nabu Casa or a VPN back into the LAN, deliberately not set up yet.
 
 **MQTT credentials, if the broker needs them, are never in this file.** They're
 optional fields (`mqtt_user`, `mqtt_password`) in the same persisted
-`config.json` described below, set by hand on the device, not via
-`doorbell-web` or git. `homelab` is public.
+`config.json` described below, set through `doorbell-web`, never committed to
+git. `homelab` is public. The file itself is `chmod 600`, root-only, since it
+can hold a plaintext credential.
 
 ## Configuration
 
@@ -130,9 +131,10 @@ optional fields (`mqtt_user`, `mqtt_password`) in the same persisted
 - **`mqtt_user`** / **`mqtt_password`** (optional): only needed if the Mosquitto
   broker requires authentication. Unset means an anonymous MQTT connection.
 
-`to` and `message` change at `http://thuroros.local:8080/doorbell`.
-`mqtt_user`/`mqtt_password` are edited on the device directly (not exposed in
-`doorbell-web` yet).
+Everything above changes at `http://thuroros.local:8080/doorbell`. The password
+field is never pre-filled with the current value, a blank submit leaves it
+unchanged; clearing the username drops both fields together, since a password
+with no username is meaningless.
 
 ## Operational notes
 

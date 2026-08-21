@@ -185,8 +185,9 @@ stages:
             #!/usr/bin/env python3
             """Tiny config UI for the doorbell, served at http://thuroros.local:8080/doorbell
 
-            Lets you pick who gets notified (admin/family) and change the message text
-            without redeploying. Writes the same config file the doorbell service reads.
+            Lets you pick who gets notified (admin/family), change the message text,
+            and set the MQTT broker credential, all without redeploying. Writes the
+            same config file the doorbell service reads.
             """
             import json
             import os
@@ -200,23 +201,38 @@ stages:
             ALLOWED_RECIPIENTS = ["admin", "family"]
             PORT = 8080
 
-            def load_config():
+            def read_raw_config():
+                """The full persisted config, real password included. Only for
+                do_POST's merge -- load_config()/render() must never see the
+                real password value, so the page can never echo it back out."""
                 try:
                     with open(CONFIG_PATH) as f:
-                        cfg = json.load(f)
+                        return json.load(f)
                 except (FileNotFoundError, json.JSONDecodeError, OSError):
-                    cfg = {}
+                    return {}
+
+            def load_config():
+                cfg = read_raw_config()
                 to = cfg.get("to", DEFAULT_TO)
                 if to not in ALLOWED_RECIPIENTS:
                     to = DEFAULT_TO
                 message = cfg.get("message") or DEFAULT_MESSAGE
-                return {"to": to, "message": message}
+                return {
+                    "to": to,
+                    "message": message,
+                    "mqtt_user": cfg.get("mqtt_user") or "",
+                    "mqtt_password_set": bool(cfg.get("mqtt_password")),
+                }
 
             def save_config(cfg):
                 os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
                 tmp = CONFIG_PATH + ".tmp"
                 with open(tmp, "w") as f:
                     json.dump(cfg, f, ensure_ascii=False)
+                # May hold a plaintext MQTT password (mission-control#344). Root-only,
+                # set before the rename so the file is never briefly world-readable
+                # under its final name.
+                os.chmod(tmp, 0o600)
                 os.replace(tmp, CONFIG_PATH)  # atomic
 
             def render(cfg, saved=False):
@@ -225,6 +241,12 @@ stages:
                     for r in ALLOWED_RECIPIENTS
                 )
                 banner = '<p class="ok">✅ Saved</p>' if saved else ""
+                password_placeholder = "(unchanged)" if cfg["mqtt_password_set"] else ""
+                password_hint = (
+                    "Leave blank to keep the current password."
+                    if cfg["mqtt_password_set"]
+                    else "No password set: MQTT connects anonymously."
+                )
                 return f"""<!DOCTYPE html>
             <html lang="en">
             <head>
@@ -251,6 +273,14 @@ stages:
               <label for="message">Message</label>
               <input type="text" id="message" name="message" value="{html.escape(cfg["message"])}">
               <p class="hint">Default: {html.escape(DEFAULT_MESSAGE)}</p>
+
+              <label for="mqtt_user">MQTT username</label>
+              <input type="text" id="mqtt_user" name="mqtt_user" value="{html.escape(cfg["mqtt_user"])}">
+              <p class="hint">Blank means an anonymous MQTT connection.</p>
+
+              <label for="mqtt_password">MQTT password</label>
+              <input type="password" id="mqtt_password" name="mqtt_password" value="" placeholder="{password_placeholder}">
+              <p class="hint">{password_hint}</p>
 
               <button type="submit">Save</button>
             </form>
@@ -284,15 +314,33 @@ stages:
                         return
                     length = int(self.headers.get("Content-Length", 0))
                     form = parse_qs(self.rfile.read(length).decode("utf-8"), keep_blank_values=True)
-                    cfg = load_config()
+                    # The raw file, real password included -- never load_config()'s
+                    # sanitized view, which drops the password on purpose.
+                    cfg = read_raw_config()
                     if form.get("reset", ["0"])[0] == "1":
                         cfg["message"] = DEFAULT_MESSAGE
                     else:
-                        to = form.get("to", [cfg["to"]])[0]
+                        to = form.get("to", [cfg.get("to", DEFAULT_TO)])[0]
                         if to in ALLOWED_RECIPIENTS:
                             cfg["to"] = to
-                        message = form.get("message", [cfg["message"]])[0].strip()
+                        message = form.get("message", [cfg.get("message", DEFAULT_MESSAGE)])[0].strip()
                         cfg["message"] = message or DEFAULT_MESSAGE
+
+                        mqtt_user = form.get("mqtt_user", [cfg.get("mqtt_user", "")])[0].strip()
+                        if mqtt_user:
+                            cfg["mqtt_user"] = mqtt_user
+                            mqtt_password = form.get("mqtt_password", [""])[0]
+                            if mqtt_password:
+                                # Blank means "leave the current password alone" --
+                                # it is never echoed into the form, so blank is not
+                                # distinguishable from "untouched".
+                                cfg["mqtt_password"] = mqtt_password
+                        else:
+                            # No username means no auth; drop both so a stale
+                            # password can never linger for a username that no
+                            # longer exists.
+                            cfg.pop("mqtt_user", None)
+                            cfg.pop("mqtt_password", None)
                     save_config(cfg)
                     # Post/Redirect/Get so a refresh doesn't resubmit
                     self.send_response(303)
