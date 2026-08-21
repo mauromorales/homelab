@@ -41,8 +41,10 @@ Each node lives in `nodes/<name>/` and follows the same shape:
 | `noos` | Local-AI node | amd64 / `generic` | on hold |
 | `midnight` | Always-on agent host (Beelink SER5) | amd64 | **not an image yet — see below** |
 
-"On hold" nodes are gated with `if: false` in `release.yaml`; re-enable a node
-by removing that line (see the note at the top of the file).
+"On hold" nodes are gated with `false &&` prefixed onto each job's tag-scoped
+`if:` in `release.yaml`; re-enable a node by removing the `false && ` prefix
+from both its `-base` job and its factory job (see the note at the top of the
+file).
 
 `midnight` is the exception to the pattern: it is **documentation-only** so far
 (`README.md`, no `Dockerfile`/`cloud-config.yaml`). It currently runs interim
@@ -101,10 +103,15 @@ nodes use the factory's default Kairos layering.
   and runs the factory with `quay.expires-after=2d` so test artifacts are
   ephemeral. Use these to validate a change to a Dockerfile or cloud-config.
 - `.github/workflows/release.yaml` — **releases**, triggered by pushing a
-  `v*` tag. Builds and publishes durable images for the enabled nodes.
+  `<node>-v*` tag. Builds and publishes a durable image for that one node.
+  Each node versions and releases independently (mission-control#352); a bare
+  `v*` tag triggers nothing.
 
-To cut a release: push a `v*` git tag. To test a node change: open a PR touching
-`nodes/<node>/` and let `build-<node>.yaml` run.
+To cut a release for one node: push a `<node>-v<semver>` git tag, e.g.
+`thuroros-v1.1.2`. `release.yaml` doesn't create a GitHub Release itself, only
+the quay.io image; create the Release separately if you want one, scoped to
+the same tag. To test a node change: open a PR touching `nodes/<node>/` and
+let `build-<node>.yaml` run.
 
 ## Cross-node conventions worth knowing
 
