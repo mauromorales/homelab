@@ -85,7 +85,10 @@ jobs:
       - name: Install AuroraBoot build + ISO dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpcsclite-dev squashfs-tools xorriso dosfstools
+          # mtools provides mcopy, which AuroraBoot shells out to when writing
+          # the ISO's EFI System Partition (FAT). Missing here: "exec: \"mcopy\":
+          # executable file not found in $PATH", https://github.com/mauromorales/homelab/actions/runs/32492388737/job/96802839319
+          sudo apt-get install -y libpcsclite-dev squashfs-tools xorriso dosfstools mtools
 
       - name: Build AuroraBoot
         working-directory: auroraboot-src
