@@ -13,4 +13,5 @@ RUN apt-get update && apt-get install -y \
     python3-lgpio \
     python3-requests \
     python3-tz \
+    python3-paho-mqtt \
     && rm -rf /var/lib/apt/lists/*
