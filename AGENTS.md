@@ -39,10 +39,18 @@ Each node lives in `nodes/<name>/` and follows the same shape:
 | `protos` | K8s homelab node | amd64 / `generic` | on hold |
 | `kairos` | Kairos + debugging tools | amd64 / `generic` | on hold |
 | `noos` | Local-AI node | amd64 / `generic` | on hold |
+| `kairos-riscv64` | Community riscv64 hardware test image, not a real node | riscv64 / `generic` | experimental — see below |
 | `midnight` | Always-on agent host (Beelink SER5) | amd64 | **not an image yet — see below** |
 
 "On hold" nodes are gated with `if: false` in `release.yaml`; re-enable a node
 by removing that line (see the note at the top of the file).
+
+`kairos-riscv64` doesn't fit that pattern either: `kairos-io/kairos-factory-action`
+hard-rejects any arch other than amd64/arm64, so it can't go through
+`release.yaml`'s factory-based pipeline at all. It has its own
+`build-kairos-riscv64.yaml`, which validates on push/PR like every other node
+but only publishes a GitHub Release (not a `quay.io` image) when manually
+triggered with a version input — see `nodes/kairos-riscv64/README.md`.
 
 `midnight` is the exception to the pattern: it is **documentation-only** so far
 (`README.md`, no `Dockerfile`/`cloud-config.yaml`). It currently runs interim

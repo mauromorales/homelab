@@ -1,0 +1,134 @@
+name: 'Build KairOS riscv64 image'
+
+# No kairos-factory-action here, unlike every other node's workflow: its
+# reusable workflow hard-rejects any arch other than amd64/arm64
+# (kairos-io/kairos-factory-action's reusable-factory.yaml errors "arch must
+# be 'amd64' or 'arm64'"). This runs kairos-init and AuroraBoot directly
+# instead. See nodes/kairos-riscv64/README.md for the full story, including
+# why AuroraBoot is built from source rather than pulled as a container.
+#
+# Push/PR just validates the build. Publishing an ISO to a GitHub Release is
+# a manual workflow_dispatch step, not tied to a tag push -- this node is
+# experimental and the release should be a deliberate action, not automatic.
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'nodes/kairos-riscv64/**'
+      - '.github/workflows/build-kairos-riscv64.yaml'
+  pull_request:
+    paths:
+      - 'nodes/kairos-riscv64/**'
+      - '.github/workflows/build-kairos-riscv64.yaml'
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Version to publish as a GitHub Release (e.g. 0.1.0). Leave empty to just build without publishing.'
+        required: false
+        type: string
+
+permissions:
+  contents: write # only used when release_version is set, to create the GitHub Release
+  actions: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.release_version }}" ]; then
+            echo "value=${{ inputs.release_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build base image
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/riscv64
+          file: nodes/kairos-riscv64/Dockerfile
+          context: nodes/kairos-riscv64
+          tags: kairos-riscv64:base
+          load: true
+
+      - name: Kairosify
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/riscv64
+          file: nodes/kairos-riscv64/kairos.Dockerfile
+          context: nodes/kairos-riscv64
+          build-args: |
+            BASE_IMAGE=kairos-riscv64:base
+            VERSION=${{ steps.version.outputs.value }}
+          tags: kairos-riscv64:kairos
+          load: true
+
+      # quay.io/kairos/auroraboot:latest is stale for riscv64 -- see the
+      # README for why. Build from AuroraBoot's own main branch instead.
+      - name: Checkout AuroraBoot
+        uses: actions/checkout@v6
+        with:
+          repository: kairos-io/AuroraBoot
+          path: auroraboot-src
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: auroraboot-src/go.mod
+
+      - name: Install AuroraBoot build + ISO dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcsclite-dev squashfs-tools xorriso dosfstools
+
+      - name: Build AuroraBoot
+        working-directory: auroraboot-src
+        run: |
+          # internal/ui embeds the compiled React frontend via `go:embed
+          # all:dist`; the CLI-only build this workflow needs doesn't build
+          # that frontend, so a placeholder file is enough to satisfy embed.
+          mkdir -p internal/ui/dist
+          touch internal/ui/dist/.gitkeep
+          go build -ldflags "-X main.version=v0.0.0-riscv64-node" -o ../auroraboot .
+
+      - name: Build ISO
+        run: |
+          mkdir -p output
+          # sudo: dumping the source image's rootfs sets file ownership that
+          # an unprivileged process can't Lchown.
+          sudo ./auroraboot --debug build-iso --arch riscv64 --output ./output/ \
+            --override-name kairos-riscv64-ubuntu \
+            docker:kairos-riscv64:kairos
+          sudo chown -R "$(id -u):$(id -g)" output
+
+      - name: Upload build artifact
+        if: ${{ inputs.release_version == '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: kairos-riscv64-ubuntu-iso-sha256
+          path: output/kairos-riscv64-ubuntu.iso.sha256
+          retention-days: 7
+
+      - name: Publish GitHub Release
+        if: ${{ inputs.release_version != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "kairos-riscv64-v${{ inputs.release_version }}" \
+            output/kairos-riscv64-ubuntu.iso \
+            output/kairos-riscv64-ubuntu.iso.sha256 \
+            --title "KairOS riscv64 v${{ inputs.release_version }}" \
+            --notes "Experimental riscv64 Kairos image. See nodes/kairos-riscv64/README.md for what this is and how to test it." \
+            --prerelease
