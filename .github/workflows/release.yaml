@@ -10,6 +10,11 @@ permissions:
   security-events: write
   id-token: write
   actions: read
+  # v1.4.5's factory build job requests packages: write for the image push
+  # step (v1.2.0, the old pin, did not). Without it here, GITHUB_TOKEN gets
+  # capped to packages:none and the run is rejected before any job starts.
+  # See mission-control#339/#340.
+  packages: write
 # NOTE: only thuroros is currently released. kairos, protos and noos are on
 # hold (if: false) until they have been tested; remove the `if: false` line
 # from a job to bring it back into the release. See the status table in README.
@@ -162,7 +167,7 @@ jobs:
   thuroros:
     name: Kairos Factory
     needs: thuroros-base
-    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@4d04258586b75aaf037047b668e2ff400f965bcf # v1.2.0
+    uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@e2108928941a741b690e3f879f46e5f0706ae565 # v1.4.5
     secrets:
       registry_username: ${{ secrets.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
@@ -174,6 +179,11 @@ jobs:
       version: "auto"
       raw: true
       grype: true
+      # thuroros's SBOM exceeds BuildKit's fixed 40 MiB attestation limit.
+      # See mission-control#123/#339/#340. Real cost: no attached bill of
+      # materials on the published image, until it's shrunk or published
+      # as a separate (uncapped) artifact instead.
+      sbom: false
       security_scan_mode: "report-only"
       registry_domain: "quay.io"
       registry_namespace: "mauromorales"
