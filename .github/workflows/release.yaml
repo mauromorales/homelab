@@ -3,7 +3,13 @@ name: 'Build Homelab images'
 on:
   push:
     tags:
-      - 'v*'
+      # Scoped per node, so each OS versions and releases independently
+      # (mission-control#352). A bare v* tag no longer triggers anything --
+      # full cutover, not a fallback.
+      - 'kairos-v*'
+      - 'protos-v*'
+      - 'thuroros-v*'
+      - 'noos-v*'
 
 permissions:
   contents: write
@@ -16,15 +22,23 @@ permissions:
   # See mission-control#339/#340.
   packages: write
 # NOTE: only thuroros is currently released. kairos, protos and noos are on
-# hold (if: false) until they have been tested; remove the `if: false` line
-# from a job to bring it back into the release. See the status table in README.
+# hold (`false &&` prefixed onto each job's tag-scoped `if:`) until they have
+# been tested; remove the `false && ` prefix from both the -base job and the
+# factory job to bring a node back into the release. See the status table in
+# README. Pushing e.g. `kairos-v1.0.0` cuts that node's release; the other
+# nodes' jobs skip, their `if:` never matches a different node's tag prefix.
 jobs:
   kairos-base:
-    if: false  # on hold — re-enable once tested
+    if: false && startsWith(github.ref_name, 'kairos-v')  # on hold: remove "false && " to re-enable
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Determine version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#kairos-}" >> "$GITHUB_OUTPUT"
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -43,11 +57,16 @@ jobs:
           tags: quay.io/mauromorales/kairos:base-${{ github.sha }}
           push: true
   protos-base:
-    if: false  # on hold — re-enable once tested
+    if: false && startsWith(github.ref_name, 'protos-v')  # on hold: remove "false && " to re-enable
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Determine version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#protos-}" >> "$GITHUB_OUTPUT"
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -66,10 +85,16 @@ jobs:
           tags: quay.io/mauromorales/protos:base-${{ github.sha }}
           push: true
   thuroros-base:
+    if: startsWith(github.ref_name, 'thuroros-v')
     runs-on: ubuntu-24.04-arm
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Determine version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#thuroros-}" >> "$GITHUB_OUTPUT"
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -88,11 +113,16 @@ jobs:
           tags: quay.io/mauromorales/thuroros:base-${{ github.sha }}
           push: true
   noos-base:
-    if: false  # on hold — re-enable once tested
+    if: false && startsWith(github.ref_name, 'noos-v')  # on hold: remove "false && " to re-enable
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Determine version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#noos-}" >> "$GITHUB_OUTPUT"
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -112,7 +142,7 @@ jobs:
           push: true
 
   kairos:
-    if: false  # on hold — re-enable once tested
+    if: false && startsWith(github.ref_name, 'kairos-v')  # on hold: remove "false && " to re-enable
     name: Kairos Factory
     needs: kairos-base
     uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@4d04258586b75aaf037047b668e2ff400f965bcf # v1.2.0
@@ -123,7 +153,7 @@ jobs:
       base_image: quay.io/mauromorales/kairos:base-${{ github.sha }}
       model: "generic"
       arch: "amd64"
-      version: "auto"
+      version: ${{ needs.kairos-base.outputs.version }}
       iso: true
       grype: true
       security_scan_mode: "report-only"
@@ -138,7 +168,7 @@ jobs:
       custom_job_name_format: "kairos"
       release: false
   protos:
-    if: false  # on hold — re-enable once tested
+    if: false && startsWith(github.ref_name, 'protos-v')  # on hold: remove "false && " to re-enable
     name: Kairos Factory
     needs: protos-base
     uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@4d04258586b75aaf037047b668e2ff400f965bcf # v1.2.0
@@ -149,7 +179,7 @@ jobs:
       base_image: quay.io/mauromorales/protos:base-${{ github.sha }}
       model: "generic"
       arch: "amd64"
-      version: "auto"
+      version: ${{ needs.protos-base.outputs.version }}
       iso: true
       grype: true
       security_scan_mode: "report-only"
@@ -165,6 +195,7 @@ jobs:
       cloud_config: nodes/protos/cloud-config.yaml
       release: true
   thuroros:
+    if: startsWith(github.ref_name, 'thuroros-v')
     name: Kairos Factory
     needs: thuroros-base
     uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@e2108928941a741b690e3f879f46e5f0706ae565 # v1.4.5
@@ -176,7 +207,7 @@ jobs:
       base_image: quay.io/mauromorales/thuroros:base-${{ github.sha }}
       model: "rpi4"
       arch: "arm64"
-      version: "auto"
+      version: ${{ needs.thuroros-base.outputs.version }}
       raw: true
       grype: true
       # thuroros's SBOM exceeds BuildKit's fixed 40 MiB attestation limit.
@@ -195,7 +226,7 @@ jobs:
       cloud_config: nodes/thuroros/cloud-config.yaml
       release: true
   noos:
-    if: false  # on hold — re-enable once tested
+    if: false && startsWith(github.ref_name, 'noos-v')  # on hold: remove "false && " to re-enable
     name: Kairos Factory
     needs: noos-base
     uses: kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml@4d04258586b75aaf037047b668e2ff400f965bcf # v1.2.0
@@ -206,7 +237,7 @@ jobs:
       base_image: quay.io/mauromorales/noos:base-${{ github.sha }}
       model: "generic"
       arch: "amd64"
-      version: "auto"
+      version: ${{ needs.noos-base.outputs.version }}
       iso: true
       grype: true
       security_scan_mode: "report-only"
