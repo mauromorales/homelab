@@ -22,6 +22,11 @@ permissions:
   security-events: write
   id-token: write
   actions: read
+  # v1.4.5's factory build job requests packages: write for the image push
+  # step (v1.2.0, this workflow's previous pin, did not). Without it here,
+  # GITHUB_TOKEN gets capped to packages:none regardless of what the reusable
+  # workflow itself declares, and the run is rejected before any job starts.
+  packages: write
 jobs:
   thuroros-base:
     runs-on: ubuntu-24.04-arm
