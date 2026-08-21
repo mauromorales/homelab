@@ -15,13 +15,16 @@ This lab is my personal sandbox for exploring OS design, Kubernetes architecture
 
 ## Hardware
 
-| Device | Role in Lab | CPU | GPU | Memory | Storage |
-| ------ | ----------- | --- | --- | ------ | ------- |
-| HP ProDesk 600 G4 Mini | Control Plane & Worker | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
-| Mac Mini | iCloud Supporing Services | M2 | M2 | 8G | 256 GB SSD |
-| Raspberry Pi 4 | Doorbell relay (`thuroros`) | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
-| Raspberry Pi 4 | Home Assistant host (see ADR-005) | ARM Cortex-A72 | Whatever comes in the Pi | 8G | USB SSD |
-| Raspberry Pi 5 | Spare | ARM Cortex-A76 | Whatever comes in the Pi | TBC | TBC |
+| Device | Name | Role in Lab | Status | CPU | GPU | Memory | Storage |
+| ------ | ---- | ----------- | ------ | --- | --- | ------ | ------- |
+| Beelink SER5 | [`midnight`](./nodes/midnight/README.md) | Always-on agent host | Running | Ryzen 7 5825U, 8C/16T | Radeon (integrated) | 64 GB DDR4-3200 | 1 TB NVMe SSD |
+| HP ProDesk 600 G4 Mini | TBC | Control Plane & Worker | Planned | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
+| Mac Mini | `polaris` | iCloud Supporting Services | Running | M2 | M2 | 8G | 256 GB SSD |
+| Raspberry Pi 4 | [`thuroros`](./nodes/thuroros/README.md) | Doorbell relay | Running | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
+| Raspberry Pi 4 | `homeassistant` | Home Assistant host | Running | ARM Cortex-A72 | Whatever comes in the Pi | 8G | USB SSD |
+| Raspberry Pi 5 | TBC | Not yet assigned | Spare | ARM Cortex-A76 | Whatever comes in the Pi | TBC | TBC |
+
+Four machines are up today: `midnight`, `polaris`, `thuroros` and `homeassistant`. Only `thuroros` runs an OS built from this repository—`midnight` runs Fedora as scaffolding while its Kairos image is built, `polaris` runs macOS, and `homeassistant` runs Home Assistant OS.
 
 ## Platform Infrastructure
 
@@ -63,6 +66,8 @@ Kairos Factory produces two artifacts per build:
 
 Only **ThurorOS** is currently built by the [release pipeline](./.github/workflows/release.yaml); the other nodes are on hold until they have been tested.
 
+This table is about the images I build here, not about every machine that is up. The other running machines—`midnight`, `polaris` and `homeassistant`—boot an OS that comes from somewhere else, and the hardware table above is the place to look for them.
+
 More on this topic: [What Are Special-Purpose Operating Systems in the Cloud-Native World?](https://www.mauromorales.com/2025/04/16/what-are-special-purpose-operating-systems-in-the-cloud-native-world/)
 
 ### Kubernetes Distribution & Container Runtime
@@ -80,7 +85,7 @@ For now, I stick to the defaults that come with K0s to keep the learning curve s
 At the moment, only one:
 
 - **[mowa](https://github.com/mauromorales/mowa)** — sends notifications through Apple Messages and provides simple shared storage outside the cluster.  
-  Runs on a Mac Mini M2 (8 GB RAM).
+  Runs on `polaris`, the Mac Mini M2 (8 GB RAM). `thuroros` reaches it at `polaris.local`.
 
 ## Related Writings
 

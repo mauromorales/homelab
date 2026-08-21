@@ -2,13 +2,16 @@
 
 Status: active. Interim OS: Fedora (scaffolding). Target OS: Kairos Ubuntu 24.04 LTS flavor (see homelab ADR-001, in the private steering repository), later Hadron.
 Role: always-on agent host for a 6-month agentic development experiment.
-Last updated: 2026-07-19.
+Last updated: 2026-08-14.
 
 ## Identity
 
 | Item | Value |
 |---|---|
-| Model | Beelink SER5 (AMD Ryzen, 32 GB RAM) |
+| Model | Beelink SER5 |
+| CPU | AMD Ryzen 7 5825U, 8 cores / 16 threads, Radeon integrated graphics |
+| Memory | 64 GB DDR4-3200 (2 × 32 GB) |
+| Storage | 1 TB NVMe SSD (Transcend TS1TMTE220S) |
 | Hostname | midnight |
 | Primary NIC | `enp1s0` (Realtek, onboard Ethernet) |
 | MAC (WoL target) | redacted — kept in private notes |
