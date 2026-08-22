@@ -1,3 +1,7 @@
+# check=skip=InvalidDefaultArgInFrom
+# BASE_IMAGE has no default on purpose: the CI workflow always supplies it
+# (kairos-riscv64-base's pushed image), and a build without it should fail
+# loudly rather than silently resolve to an empty FROM.
 ARG KAIROS_INIT=latest
 ARG BASE_IMAGE
 
