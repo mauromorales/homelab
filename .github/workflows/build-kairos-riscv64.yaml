@@ -154,9 +154,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "kairos-riscv64-v${{ inputs.release_version }}" \
+          version="${{ inputs.release_version }}"
+          # --prerelease is a semver signal, not an "is this experimental"
+          # one -- this node's own README already tells testers it's
+          # experimental. Only alpha/beta/rc-suffixed versions get flagged;
+          # a plain x.y.z becomes the repo's Latest release like any other.
+          prerelease_flag=()
+          if [[ "$version" =~ (alpha|beta|rc) ]]; then
+            prerelease_flag=(--prerelease)
+          fi
+          gh release create "kairos-riscv64-v${version}" \
             output/kairos-riscv64-ubuntu.iso \
             output/kairos-riscv64-ubuntu.iso.sha256 \
-            --title "KairOS riscv64 v${{ inputs.release_version }}" \
+            --title "KairOS riscv64 v${version}" \
             --notes "Experimental riscv64 Kairos image. See nodes/kairos-riscv64/README.md for what this is and how to test it." \
-            --prerelease
+            "${prerelease_flag[@]}"
