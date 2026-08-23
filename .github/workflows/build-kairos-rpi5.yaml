@@ -20,7 +20,7 @@ on:
 
 jobs:
   kairos-rpi5-base:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -30,8 +30,6 @@ jobs:
           registry: quay.io
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Build and push
@@ -44,23 +42,23 @@ jobs:
           push: true
 
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     needs: kairos-rpi5-base
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # A registry reference, not a locally --load'ed image: the
-      # docker-container buildx builder runs an isolated BuildKit instance
-      # for this cross-build (arm64 target on an amd64 runner) and can't
-      # see the host docker daemon's image store. Same issue and same fix
-      # as kairos-riscv64 (mauromorales/homelab#43's history, commit 7a34dde).
+      # A registry reference, not a locally --load'ed image: setup-buildx-action's
+      # default docker-container driver runs an isolated BuildKit instance
+      # that can't see the host docker daemon's image store, regardless of
+      # architecture. Same reasoning kairos-riscv64 uses (mauromorales/homelab#43's
+      # history, commit 7a34dde) -- riscv64 needs it because it has no
+      # native GitHub-hosted runner and must cross-build under QEMU; this
+      # node needs it for the driver-isolation reason alone, since it now
+      # runs natively on ubuntu-24.04-arm.
       - name: Kairosify
         uses: docker/build-push-action@v6
         with:
