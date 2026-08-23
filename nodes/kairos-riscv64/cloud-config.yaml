@@ -3,10 +3,9 @@
 hostname: "kairos-riscv64"
 
 users:
-  - name: "mauro"
+  - name: kairos
+    passwd: kairos
     groups: ["admin"]
-    ssh_authorized_keys:
-      - github:mauromorales
 
 # The k3s.service unit itself comes from kairos.Dockerfile's install step
 # (get.k3s.io, run at build time), same as any other Kairos k3s node. This
