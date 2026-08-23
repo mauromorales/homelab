@@ -3,42 +3,22 @@
 hostname: "kairos-riscv64"
 
 users:
-  - name: "mauro"
+  - name: kairos
+    passwd: kairos
     groups: ["admin"]
-    ssh_authorized_keys:
-      - github:mauromorales
 
-stages:
-  initramfs:
-    - name: "Add k3s service"
-      files:
-        - path: /etc/systemd/system/k3s.service
-          permissions: 0644
-          owner: 0
-          group: 0
-          content: |
-            [Unit]
-            Description=k3s (riscv64 test build)
-            Wants=network-online.target
-            After=network-online.target
-
-            [Service]
-            Type=simple
-            # Kairos's root filesystem is itself an overlay; containerd's default
-            # overlayfs snapshotter can't stack overlay-on-overlay and fails to
-            # mount. --snapshotter=native is the fix -- this is a general
-            # overlay-root-filesystem issue, not riscv64-specific, and the same
-            # class of problem k0s's own riscv64 CI hit and worked around by
-            # avoiding overlay mounts.
-            ExecStart=/usr/local/bin/k3s server --write-kubeconfig-mode=644 --disable=traefik --snapshotter=native
-            Restart=always
-            RestartSec=5
-            SyslogIdentifier=k3s
-            StandardOutput=journal
-            StandardError=journal
-
-            [Install]
-            WantedBy=multi-user.target
-    - name: "Enable k3s service"
-      commands:
-        - ln -sf /etc/systemd/system/k3s.service /etc/systemd/system/multi-user.target.wants/k3s.service
+# The k3s.service unit itself comes from kairos.Dockerfile's install step
+# (get.k3s.io, run at build time), same as any other Kairos k3s node. This
+# just configures and starts it: provider-kairos's k3s stanza writes a
+# systemd override (ExecStart) onto that unit, it doesn't create one.
+k3s:
+  enabled: true
+  args:
+    - --write-kubeconfig-mode=644
+    - --disable=traefik
+    # Kairos's root filesystem is itself an overlay; containerd's default
+    # overlayfs snapshotter can't stack overlay-on-overlay and fails to
+    # mount. This is a general overlay-root-filesystem issue, not
+    # riscv64-specific, and the same class of problem k0s's own riscv64 CI
+    # hit and worked around by avoiding overlay mounts.
+    - --snapshotter=native

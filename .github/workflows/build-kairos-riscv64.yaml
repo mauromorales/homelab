@@ -137,7 +137,7 @@ jobs:
           # sudo: dumping the source image's rootfs sets file ownership that
           # an unprivileged process can't Lchown.
           sudo ./auroraboot --debug build-iso --arch riscv64 --output ./output/ \
-            --override-name kairos-riscv64-ubuntu \
+            --override-name kairos-riscv64-ubuntu-${{ steps.version.outputs.value }} \
             docker:kairos-riscv64:kairos
           sudo chown -R "$(id -u):$(id -g)" output
 
@@ -146,7 +146,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kairos-riscv64-ubuntu-iso-sha256
-          path: output/kairos-riscv64-ubuntu.iso.sha256
+          path: output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso.sha256
           retention-days: 7
 
       - name: Publish GitHub Release
@@ -164,8 +164,8 @@ jobs:
             prerelease_flag=(--prerelease)
           fi
           gh release create "kairos-riscv64-v${version}" \
-            output/kairos-riscv64-ubuntu.iso \
-            output/kairos-riscv64-ubuntu.iso.sha256 \
+            output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso \
+            output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso.sha256 \
             --title "KairOS riscv64 v${version}" \
             --notes "Experimental riscv64 Kairos image. See nodes/kairos-riscv64/README.md for what this is and how to test it." \
             "${prerelease_flag[@]}"

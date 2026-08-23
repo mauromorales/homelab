@@ -24,13 +24,49 @@ RUN --mount=type=bind,from=kairos-init,src=/kairos-init,dst=/kairos-init \
 
 # k3s has no official riscv64 release yet (kairos-io/kairos#4083, and
 # k3s-io/k3s#7151 -- "not prioritized, no build infra"). kairos-init's -p/
-# --provider flag can't help here either: it installs a provider kairos-init
-# already knows how to fetch, and riscv64 k3s isn't one of them. Fetching the
-# binary directly from CARV-ICS-FORTH's actively-maintained riscv64 fork
-# (https://github.com/CARV-ICS-FORTH/k3s) is the only way to get it into the
-# image at all today. Swap this for the official k3s release the moment one
+# --provider flag can't help here either: provider-kairos's own BuildEvent
+# handler (the thing -p k3s actually triggers) downloads get.k3s.io and runs
+# it without INSTALL_K3S_SKIP_DOWNLOAD, so it still tries to fetch an
+# official riscv64 binary that doesn't exist, and fails.
+#
+# This replicates that same handler's install (provider-kairos's
+# buildEvent.go: INSTALL_K3S_BIN_DIR=/usr/bin INSTALL_K3S_SKIP_ENABLE=true),
+# but pre-places CARV-ICS-FORTH's actively-maintained riscv64 fork
+# (https://github.com/CARV-ICS-FORTH/k3s) at the path the installer expects
+# and adds INSTALL_K3S_SKIP_DOWNLOAD=true, so get.k3s.io's script only does
+# what still works on riscv64: write the real systemd unit and enable it,
+# instead of hand-writing that unit from scratch. Swap this whole block for
+# a plain `kairos-init -p k3s` the moment an official riscv64 release
 # exists -- there is nothing else riscv64-specific about this node.
 ARG K3S_RISCV64_RELEASE=20260817
-RUN curl -fL -o /usr/local/bin/k3s \
+RUN curl -fL -o /usr/bin/k3s \
         "https://github.com/CARV-ICS-FORTH/k3s/releases/download/${K3S_RISCV64_RELEASE}/k3s-riscv64" && \
-    chmod +x /usr/local/bin/k3s
+    chmod +x /usr/bin/k3s && \
+    curl -sfL https://get.k3s.io -o /tmp/k3s-install.sh && \
+    chmod +x /tmp/k3s-install.sh && \
+    INSTALL_K3S_BIN_DIR=/usr/bin \
+    INSTALL_K3S_SKIP_DOWNLOAD=true \
+    INSTALL_K3S_SKIP_ENABLE=true \
+    INSTALL_K3S_SKIP_SELINUX_RPM=true \
+    /tmp/k3s-install.sh && \
+    rm -f /tmp/k3s-install.sh
+
+# The k3s.service unit above is necessary but not sufficient: the cloud-config
+# `k3s:` stanza is read at boot by a separate binary, provider-kairos (the
+# kairos-agent plugin registered under /system/providers/agent-provider-kairos,
+# symlinked to /usr/bin/kairos), not by kairos-agent itself. kairos-init's own
+# GetInstallProviderBinaries step normally fetches this from provider-kairos's
+# GitHub releases when a provider is requested, but falls back to an embedded
+# binary (amd64/arm64 only) when no version override is given, and this step
+# was never reached here since -p/--provider isn't used on this node (see the
+# comment above). provider-kairos does publish a riscv64 release, so fetch it
+# the same way kairos-init would, instead of leaving the stanza with nothing
+# to read it.
+ARG PROVIDER_KAIROS_VERSION=v2.16.4
+RUN mkdir -p /system/providers && \
+    curl -fL -o /tmp/provider-kairos.tar.gz \
+        "https://github.com/kairos-io/provider-kairos/releases/download/${PROVIDER_KAIROS_VERSION}/provider-kairos-${PROVIDER_KAIROS_VERSION}-linux-riscv64.tar.gz" && \
+    tar -xzf /tmp/provider-kairos.tar.gz -O provider-kairos > /system/providers/agent-provider-kairos && \
+    chmod +x /system/providers/agent-provider-kairos && \
+    ln -sf /system/providers/agent-provider-kairos /usr/bin/kairos && \
+    rm -f /tmp/provider-kairos.tar.gz
