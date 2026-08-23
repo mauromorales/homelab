@@ -138,6 +138,7 @@ jobs:
           # an unprivileged process can't Lchown.
           sudo ./auroraboot --debug build-iso --arch riscv64 --output ./output/ \
             --override-name kairos-riscv64-ubuntu \
+            --cloud-config nodes/kairos-riscv64/cloud-config.yaml \
             docker:kairos-riscv64:kairos
           sudo chown -R "$(id -u):$(id -g)" output
 
