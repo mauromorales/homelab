@@ -1,0 +1,77 @@
+name: 'Build KairOS rpi5 image'
+
+# Validates the OS-layer build only (base + kairos-init), on push/PR. This
+# does NOT produce a flashable SD card image -- see nodes/kairos-rpi5/README.md
+# for why: the u-boot/firmware boot chain for the Pi 5 is unsolved, upstream
+# and here. No factory-action here either, the same reason kairos-riscv64
+# has none: kairos-init has no rpi5 model, so there's nothing for the
+# factory's reusable workflow to build against.
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'nodes/kairos-rpi5/**'
+      - '.github/workflows/build-kairos-rpi5.yaml'
+  pull_request:
+    paths:
+      - 'nodes/kairos-rpi5/**'
+      - '.github/workflows/build-kairos-rpi5.yaml'
+
+jobs:
+  kairos-rpi5-base:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/arm64
+          file: nodes/kairos-rpi5/Dockerfile
+          context: nodes/kairos-rpi5
+          tags: quay.io/mauromorales/kairos-rpi5:base-${{ github.sha }}
+          push: true
+
+  build:
+    runs-on: ubuntu-24.04-arm
+    needs: kairos-rpi5-base
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # A registry reference, not a locally --load'ed image: setup-buildx-action's
+      # default docker-container driver runs an isolated BuildKit instance
+      # that can't see the host docker daemon's image store, regardless of
+      # architecture. Same reasoning kairos-riscv64 uses (mauromorales/homelab#43's
+      # history, commit 7a34dde) -- riscv64 needs it because it has no
+      # native GitHub-hosted runner and must cross-build under QEMU; this
+      # node needs it for the driver-isolation reason alone, since it now
+      # runs natively on ubuntu-24.04-arm.
+      - name: Kairosify
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/arm64
+          file: nodes/kairos-rpi5/kairos.Dockerfile
+          context: nodes/kairos-rpi5
+          build-args: |
+            VERSION=0.0.0-${{ github.sha }}
+            BASE_IMAGE=quay.io/mauromorales/kairos-rpi5:base-${{ github.sha }}
+          tags: kairos-rpi5:kairos
+          load: true
+
+      # No ISO/raw-image step. The container build succeeding proves the OS
+      # layer is sound -- it says nothing about whether the Pi 5 can boot
+      # it. That part is manual, on real hardware, until it's understood
+      # well enough to script. See the README.

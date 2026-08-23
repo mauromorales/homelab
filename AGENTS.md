@@ -40,6 +40,7 @@ Each node lives in `nodes/<name>/` and follows the same shape:
 | `kairos` | Kairos + debugging tools | amd64 / `generic` | on hold |
 | `noos` | Local-AI node | amd64 / `generic` | on hold |
 | `kairos-riscv64` | Community riscv64 hardware test image, not a real node | riscv64 / `generic` | experimental — see below |
+| `kairos-rpi5` | Raspberry Pi 5 hardware bring-up, not a real node | arm64 / `generic` | experimental — CI validates the OS layer only, no boot artifact yet, see below |
 | `midnight` | Always-on agent host (Beelink SER5) | amd64 | **not an image yet — see below** |
 
 "On hold" nodes are gated with `false &&` prefixed onto each job's tag-scoped
@@ -53,6 +54,13 @@ hard-rejects any arch other than amd64/arm64, so it can't go through
 `build-kairos-riscv64.yaml`, which validates on push/PR like every other node
 but only publishes a GitHub Release (not a `quay.io` image) when manually
 triggered with a version input — see `nodes/kairos-riscv64/README.md`.
+
+`kairos-rpi5` is further along the same road: `kairos-init` has no `rpi5`
+model at all yet (only `rpi3`/`rpi4`), so this isn't just outside the
+factory pipeline, it has no release path either. `build-kairos-rpi5.yaml`
+validates that the `--model generic` OS layer builds — nothing more.
+Turning that into a bootable SD image needs the Pi 5 boot chain (u-boot,
+firmware) worked out by hand first; see `nodes/kairos-rpi5/README.md`.
 
 `midnight` is the exception to the pattern: it is **documentation-only** so far
 (`README.md`, no `Dockerfile`/`cloud-config.yaml`). It currently runs interim

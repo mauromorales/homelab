@@ -1,0 +1,12 @@
+#cloud-config
+
+hostname: "kairos-rpi5"
+
+users:
+  - name: kairos
+    passwd: kairos
+    groups: ["admin"]
+
+# No k3s/k0s stanza yet, on purpose. This node exists to answer one
+# question first -- does Kairos boot on a Pi 5 at all, with working Ethernet
+# and USB -- not to test clustering. Add it once that's confirmed.
