@@ -51,12 +51,34 @@ work, on any architecture.
 
 This node isn't wired into the shared `v*` release pipeline
 ([`release.yaml`](../../.github/workflows/release.yaml)) — it's too
-experimental to sit alongside the maintained nodes there, and its ISO is too
-large for GitHub's free Actions artifact storage. Pushing a
-`kairos-riscv64-v*` tag builds it and attaches the ISO to a
-[GitHub Release](../../../../releases) instead. Every `push`/`pull_request`
-touching this node also runs the build to validate changes, without
-publishing anything.
+experimental to sit alongside the maintained nodes there. A release is a
+manual `workflow_dispatch` run of `build-kairos-riscv64.yaml` with a
+`release_version` input, not a tag push — see the workflow file for why.
+Every `push`/`pull_request` touching this node also runs the build to
+validate changes, without publishing anything.
+
+A release publishes two artifacts:
+
+- **ISO**, attached to a [GitHub Release](../../../../releases) tagged
+  `kairos-riscv64-v<version>` — the installer, for booting into a live
+  environment and running the Kairos installer from there.
+- **Raw disk image**, for flashing straight to hardware or a VM disk with no
+  installer step. It routinely exceeds GitHub's 2 GiB release-asset limit, so
+  it isn't attached to the release. It's published instead as a scratch OCI
+  artifact on Quay, `quay.io/mauromorales/kairos-riscv64:<version>-img` —
+  the same shape [`kairos-io/kairos-factory-action`](https://github.com/kairos-io/kairos-factory-action)
+  uses for every other node's raw builds. Pull it back out with Docker:
+
+  ```bash
+  export IMAGE=quay.io/mauromorales/kairos-riscv64:<version>-img
+  container=$(docker create "$IMAGE" noop)   # scratch image: throwaway command, never executed
+  docker cp "$container:/output/." .
+  docker rm "$container"
+  ```
+
+  Every published release's own notes carry this same snippet, with the tag
+  filled in and the raw image's SHA256 alongside it — that copy is the one
+  worth linking someone to.
 
 ## Testing it
 
@@ -67,6 +89,10 @@ a login prompt with k3s already running:
 ```console
 $ kubectl get nodes
 ```
+
+The raw image skips the installer boot entirely — flash it directly (`dd` to
+a disk/SD card, or as a QEMU/VM disk image) and it should reach the same
+login prompt.
 
 If you get real riscv64 hardware to boot this, or if it doesn't, either way
 I'd like to know — open an issue on this repo.

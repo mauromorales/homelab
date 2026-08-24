@@ -1,0 +1,8 @@
+# Packages the raw disk image AuroraBoot writes into ./output/ as a scratch
+# OCI artifact, so it can be pushed to Quay and pulled back out with
+# `docker create` + `docker cp` -- the raw image is too big for a GitHub
+# Release asset (2 GiB per-file limit). Mirrors kairos-io/kairos's own
+# images/Dockerfile.img.
+FROM scratch
+ARG ARTIFACT
+COPY $ARTIFACT /$ARTIFACT
