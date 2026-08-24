@@ -45,18 +45,20 @@ after any boot: `uname -r`, and whether it's actually ≥6.18.
 | USB/NVMe boot in u-boot | Doesn't — `CONFIG_NVME_PCI` absent from `rpi_arm64_defconfig` |
 | RP1 Ethernet, once Linux is running | Should work on kernel ≥6.18 — unverified on Kairos specifically |
 | RP1 USB, once Linux is running | Should work on kernel ≥6.18 — unverified on Kairos specifically |
-| Getting the built OS layer onto a bootable SD card | **Open.** Not attempted by this Dockerfile |
+| Getting the built OS layer onto a bootable SD card | **Attempted, unverified.** `build-kairos-rpi5.yaml` now produces an ISO the same way `kairos-riscv64` does — whether the Pi 5 actually boots it is untested |
 
 ## How to test
 
-1. Build the base and kairos layers (see `build-kairos-rpi5.yaml` — CI
-   validates the container build only, it does not produce a flashable
-   image).
-2. The remaining step — turning `kairos-rpi5:kairos` into something an SD
-   card can actually boot — needs hands-on iteration with the real board:
-   figure out u-boot + firmware placement, flash it, and see what happens.
-   That part isn't scripted here yet because it isn't understood yet.
-3. If/when it boots: check `uname -r`, `ip a` for the Ethernet interface
+1. `build-kairos-rpi5.yaml` now builds an ISO on `workflow_dispatch`, and
+   publishes it as a GitHub Release when a `release_version` is given
+   (e.g. `0.1.0-alpha`) — same mechanism `kairos-riscv64` uses.
+2. **The ISO itself is an untested guess.** `auroraboot build-iso` produces
+   a UEFI-bootable ISO. Whether the Pi 5's firmware/u-boot chain can boot
+   that at all — versus needing a traditional RPi raw `.img` flashed to an
+   SD card — has not been confirmed on real hardware. Flashing it and
+   trying is the test.
+3. If/when it boots: check `uname -r` (≥6.18 is the bet this node's base
+   image choice depends on — see above), `ip a` for the Ethernet interface
    coming up with a DHCP lease, and `lsusb`/`dmesg` for USB enumeration.
 4. Report back on [kairos-io/kairos#2010](https://github.com/kairos-io/kairos/issues/2010)
    either way — a failure with specifics is as useful to that thread as a
