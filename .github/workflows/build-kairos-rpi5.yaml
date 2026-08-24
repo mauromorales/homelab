@@ -1,17 +1,28 @@
 name: 'Build KairOS rpi5 image'
 
 # Validates the OS-layer build (base + kairos-init) on push/PR, and builds
-# + optionally publishes an ISO on workflow_dispatch. No factory-action
-# here, the same reason kairos-riscv64 has none: kairos-init has no rpi5
-# model, so there's nothing for the factory's reusable workflow to build
-# against.
+# + optionally publishes a raw disk image on workflow_dispatch. No
+# factory-action here, the same reason kairos-riscv64 has none: kairos-init
+# has no rpi5 model, so there's nothing for the factory's reusable workflow
+# to build against.
 #
-# THE ISO IS AN UNTESTED GUESS ABOUT THE BOOT CHAIN, STATED PLAINLY IN THE
-# RELEASE NOTES BELOW. auroraboot build-iso produces a UEFI-bootable ISO,
-# the mechanism kairos-riscv64 uses -- whether the Pi 5's firmware/u-boot
-# chain can actually boot that, versus needing a traditional RPi raw .img
-# on an SD card, has not been verified on real hardware as of this
-# workflow's writing. See nodes/kairos-rpi5/README.md.
+# RAW, NOT ISO. An ISO is a CD/USB installer medium -- Raspberry Pi boards
+# boot by reading a raw disk image's boot partition directly off the SD
+# card, the same way every other Kairos RPi model ships (rpi3/rpi4) and
+# every third-party RPi image does. First cut of this workflow shipped an
+# ISO (kairos-riscv64's mechanism); Mauro caught that it made no sense for
+# this hardware. Uses AuroraBoot's `--set disk.efi=true` raw-disk path
+# instead (pkg/ops/rawDiskGeneration.go), the same one kairos-riscv64's
+# ISO-only approach never touches -- confirmed against AuroraBoot's own
+# e2e test (e2e/disks_test.go) rather than guessed.
+#
+# WHAT'S STILL UNVERIFIED, STATED PLAINLY IN THE RELEASE NOTES BELOW: the
+# raw disk is the CORRECT ARTIFACT FORMAT for a Pi, but AuroraBoot's EFI
+# raw-disk builder is generic -- it assumes standard UEFI firmware already
+# on the board, which the Pi 5 does not have natively. Whether the EFI
+# partition it produces actually chainloads through the Pi 5's own
+# firmware/u-boot has not been confirmed on real hardware. See
+# nodes/kairos-rpi5/README.md.
 on:
   push:
     branches:
@@ -101,24 +112,54 @@ jobs:
       # architectures, so there's no known staleness in the released
       # container for this arch. If that assumption turns out wrong,
       # kairos-riscv64's build-from-source workaround is the fallback.
-      - name: Build ISO
+      #
+      # `--set disk.efi=true` on the root command, not `build-iso`. This is
+      # a completely different code path (deployer/steps.go's StepGenRawDisk,
+      # pkg/ops/rawDiskGeneration.go) -- confirmed against AuroraBoot's own
+      # e2e/disks_test.go, which uses exactly this flag shape. Our own
+      # cloud-config.yaml is passed here (unlike kairos-riscv64's build-iso
+      # call, which deliberately drops it): that decision was about an
+      # `install:` stage build-iso needs for unattended install and this
+      # cloud-config doesn't have, a constraint that doesn't apply to a raw
+      # disk at all -- there's no install phase, the disk IS the installed
+      # filesystem, so nothing is being smuggled past that reasoning here.
+      #
+      # The output filename isn't ours to predict: AuroraBoot derives it
+      # from the built image's own /etc/kairos-release, not from a flag --
+      # discovered by globbing for it rather than assumed.
+      - name: Build raw disk
+        id: build_raw
         run: |
           mkdir -p output
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD/output:/output" \
+            -v "$PWD/output:/tmp/auroraboot" \
+            -v "$PWD/nodes/kairos-rpi5/cloud-config.yaml:/config.yaml:ro" \
             quay.io/kairos/auroraboot:latest \
-            --debug build-iso --arch arm64 --output /output \
-            --override-name kairos-rpi5-ubuntu-${{ steps.version.outputs.value }} \
-            docker:kairos-rpi5:kairos
+            --debug \
+            --set disable_http_server=true \
+            --set disable_netboot=true \
+            --set container_image=docker:kairos-rpi5:kairos \
+            --set state_dir=/tmp/auroraboot \
+            --set disk.efi=true \
+            --cloud-config /config.yaml
           sudo chown -R "$(id -u):$(id -g)" output
+
+          raw_path="$(find output -maxdepth 1 -name '*.raw' | head -n1)"
+          if [ -z "$raw_path" ]; then
+            echo "no .raw file produced by auroraboot" >&2
+            ls -la output
+            exit 1
+          fi
+          sha256sum "$raw_path" > "$raw_path.sha256"
+          echo "raw_path=$raw_path" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
         if: ${{ inputs.release_version == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: kairos-rpi5-ubuntu-iso-sha256
-          path: output/kairos-rpi5-ubuntu-${{ steps.version.outputs.value }}.iso.sha256
+          name: kairos-rpi5-raw-sha256
+          path: ${{ steps.build_raw.outputs.raw_path }}.sha256
           retention-days: 7
 
       - name: Publish GitHub Release
@@ -132,8 +173,8 @@ jobs:
             prerelease_flag=(--prerelease)
           fi
           gh release create "kairos-rpi5-v${version}" \
-            output/kairos-rpi5-ubuntu-${{ steps.version.outputs.value }}.iso \
-            output/kairos-rpi5-ubuntu-${{ steps.version.outputs.value }}.iso.sha256 \
+            "${{ steps.build_raw.outputs.raw_path }}" \
+            "${{ steps.build_raw.outputs.raw_path }}.sha256" \
             --title "KairOS rpi5 v${version}" \
-            --notes "Experimental, unverified Kairos image for the Raspberry Pi 5. The boot chain (u-boot + RP1 firmware) has NOT been confirmed to work on real hardware -- this ISO is a guess at whether the Pi 5 can boot the same UEFI mechanism kairos-riscv64 uses. See nodes/kairos-rpi5/README.md for what's known versus open, and report back on kairos-io/kairos#2010 either way." \
+            --notes "Experimental, unverified Kairos image for the Raspberry Pi 5, as a raw disk (flash with dd/Etcher, same as any RPi image) rather than an ISO. The EFI partition AuroraBoot produces assumes standard UEFI firmware, which the Pi 5 doesn't have natively -- whether it actually boots via the Pi 5's own firmware/u-boot chain has NOT been confirmed on real hardware. See nodes/kairos-rpi5/README.md for what's known versus open, and report back on kairos-io/kairos#2010 either way." \
             "${prerelease_flag[@]}"

@@ -15,12 +15,16 @@ lab, and to report back to that issue with anything learned.
 approach [`kairos-riscv64`](../kairos-riscv64/) uses for a board with no
 `kairos-init` model support.
 
-**Does not:** get that layer onto a Pi 5 in a way it can actually boot.
-`generic` deliberately skips board-specific packaging, which on a
-supported model (`rpi4`) is exactly what pulls in the right u-boot build
-and firmware. Reproducing that for the Pi 5 by hand — the boot partition
-layout, which u-boot build, RP1 firmware placement — is genuinely open.
-Nobody upstream has solved it either; see the issue.
+**Does not confirm:** that a Pi 5 actually boots it. `build-kairos-rpi5.yaml`
+now assembles that OS layer into a raw disk image via AuroraBoot's
+`--set disk.efi=true`, the correct artifact *format* for a Pi (flash with
+`dd`/Etcher, same as every RPi image). What that doesn't solve: `generic`
+deliberately skips board-specific packaging, which on a supported model
+(`rpi4`) is exactly what pulls in the right u-boot build and RP1 firmware,
+and AuroraBoot's raw-disk builder assumes standard UEFI firmware the Pi 5
+doesn't have natively. Whether the resulting EFI partition actually
+chainloads through the Pi 5's own boot chain is still open. Nobody
+upstream has solved it either; see the issue.
 
 ## Why Tumbleweed, not Ubuntu (matching kairos-riscv64)
 
@@ -45,18 +49,22 @@ after any boot: `uname -r`, and whether it's actually ≥6.18.
 | USB/NVMe boot in u-boot | Doesn't — `CONFIG_NVME_PCI` absent from `rpi_arm64_defconfig` |
 | RP1 Ethernet, once Linux is running | Should work on kernel ≥6.18 — unverified on Kairos specifically |
 | RP1 USB, once Linux is running | Should work on kernel ≥6.18 — unverified on Kairos specifically |
-| Getting the built OS layer onto a bootable SD card | **Attempted, unverified.** `build-kairos-rpi5.yaml` now produces an ISO the same way `kairos-riscv64` does — whether the Pi 5 actually boots it is untested |
+| Getting the built OS layer onto a bootable SD card | **Attempted, unverified.** `build-kairos-rpi5.yaml` now produces a raw disk image (`--set disk.efi=true`, not an ISO — an ISO makes no sense for a Pi, first cut of this workflow got that wrong) — whether the Pi 5 actually boots it is untested |
 
 ## How to test
 
-1. `build-kairos-rpi5.yaml` now builds an ISO on `workflow_dispatch`, and
-   publishes it as a GitHub Release when a `release_version` is given
-   (e.g. `0.1.0-alpha`) — same mechanism `kairos-riscv64` uses.
-2. **The ISO itself is an untested guess.** `auroraboot build-iso` produces
-   a UEFI-bootable ISO. Whether the Pi 5's firmware/u-boot chain can boot
-   that at all — versus needing a traditional RPi raw `.img` flashed to an
-   SD card — has not been confirmed on real hardware. Flashing it and
-   trying is the test.
+1. `build-kairos-rpi5.yaml` builds a raw disk image on `workflow_dispatch`
+   (AuroraBoot's `--set disk.efi=true`, confirmed against its own
+   `e2e/disks_test.go` rather than guessed), and publishes it as a GitHub
+   Release when a `release_version` is given (e.g. `0.1.0-alpha`).
+2. **The disk is the right format, but still an untested guess about
+   whether it boots.** A raw disk, flashed with `dd`/Etcher, is how every
+   RPi image actually gets onto a Pi — unlike the ISO the first version of
+   this pipeline mistakenly produced. What's still open: AuroraBoot's EFI
+   raw-disk builder assumes standard UEFI firmware, which the Pi 5 doesn't
+   have natively. Whether its EFI partition actually chainloads through
+   the Pi 5's own firmware/u-boot chain hasn't been confirmed. Flashing it
+   and trying is the test.
 3. If/when it boots: check `uname -r` (≥6.18 is the bet this node's base
    image choice depends on — see above), `ip a` for the Ethernet interface
    coming up with a DHCP lease, and `lsusb`/`dmesg` for USB enumeration.
