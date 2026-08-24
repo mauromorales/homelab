@@ -131,7 +131,12 @@ jobs:
         id: build_raw
         run: |
           mkdir -p output
-          docker run --rm \
+          # --privileged: raw disk generation writes partition images via
+          # loop devices (mkfs onto a loop-mounted file). First run of this
+          # step failed with "open /dev/loop-control: no such file or
+          # directory" -- an unprivileged container has no loop-control
+          # access at all, not just a missing --device mapping.
+          docker run --rm --privileged \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/output:/tmp/auroraboot" \
             -v "$PWD/nodes/kairos-rpi5/cloud-config.yaml:/config.yaml:ro" \
