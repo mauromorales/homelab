@@ -156,15 +156,24 @@ jobs:
             ls -la output
             exit 1
           fi
-          sha256sum "$raw_path" > "$raw_path.sha256"
-          echo "raw_path=$raw_path" >> "$GITHUB_OUTPUT"
+
+          # Compress: a raw EFI+recovery disk exceeds GitHub's 2GB
+          # per-asset limit uncompressed (first release attempt hit that
+          # exact error). Also just the normal way an RPi image ships --
+          # Raspberry Pi OS itself distributes .img.xz, not raw .img, and
+          # raw disks compress hard since most of the space is sparse/zero.
+          sudo apt-get update -qq && sudo apt-get install -y -qq xz-utils
+          xz -T0 -6 "$raw_path"
+          xz_path="${raw_path}.xz"
+          sha256sum "$xz_path" > "$xz_path.sha256"
+          echo "xz_path=$xz_path" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
         if: ${{ inputs.release_version == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: kairos-rpi5-raw-sha256
-          path: ${{ steps.build_raw.outputs.raw_path }}.sha256
+          name: kairos-rpi5-raw-xz-sha256
+          path: ${{ steps.build_raw.outputs.xz_path }}.sha256
           retention-days: 7
 
       - name: Publish GitHub Release
@@ -178,8 +187,8 @@ jobs:
             prerelease_flag=(--prerelease)
           fi
           gh release create "kairos-rpi5-v${version}" \
-            "${{ steps.build_raw.outputs.raw_path }}" \
-            "${{ steps.build_raw.outputs.raw_path }}.sha256" \
+            "${{ steps.build_raw.outputs.xz_path }}" \
+            "${{ steps.build_raw.outputs.xz_path }}.sha256" \
             --title "KairOS rpi5 v${version}" \
-            --notes "Experimental, unverified Kairos image for the Raspberry Pi 5, as a raw disk (flash with dd/Etcher, same as any RPi image) rather than an ISO. The EFI partition AuroraBoot produces assumes standard UEFI firmware, which the Pi 5 doesn't have natively -- whether it actually boots via the Pi 5's own firmware/u-boot chain has NOT been confirmed on real hardware. See nodes/kairos-rpi5/README.md for what's known versus open, and report back on kairos-io/kairos#2010 either way." \
+            --notes "Experimental, unverified Kairos image for the Raspberry Pi 5, as a compressed raw disk (.raw.xz -- decompress, then flash with dd/Etcher/Raspberry Pi Imager, same as any RPi image) rather than an ISO. The EFI partition AuroraBoot produces assumes standard UEFI firmware, which the Pi 5 doesn't have natively -- whether it actually boots via the Pi 5's own firmware/u-boot chain has NOT been confirmed on real hardware. See nodes/kairos-rpi5/README.md for what's known versus open, and report back on kairos-io/kairos#2010 either way." \
             "${prerelease_flag[@]}"

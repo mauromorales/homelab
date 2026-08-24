@@ -55,8 +55,11 @@ after any boot: `uname -r`, and whether it's actually ≥6.18.
 
 1. `build-kairos-rpi5.yaml` builds a raw disk image on `workflow_dispatch`
    (AuroraBoot's `--set disk.efi=true`, confirmed against its own
-   `e2e/disks_test.go` rather than guessed), and publishes it as a GitHub
-   Release when a `release_version` is given (e.g. `0.1.0-alpha`).
+   `e2e/disks_test.go` rather than guessed), compresses it (`.raw.xz` --
+   GitHub's 2GB-per-asset limit rejects the uncompressed disk, and this is
+   the normal way an RPi image ships anyway, same as Raspberry Pi OS's own
+   `.img.xz`), and publishes it as a GitHub Release when a `release_version`
+   is given (e.g. `0.1.0-alpha`). Decompress before flashing.
 2. **The disk is the right format, but still an untested guess about
    whether it boots.** A raw disk, flashed with `dd`/Etcher, is how every
    RPi image actually gets onto a Pi — unlike the ISO the first version of
