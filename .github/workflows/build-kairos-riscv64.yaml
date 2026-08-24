@@ -109,10 +109,17 @@ jobs:
 
       # quay.io/kairos/auroraboot:latest is stale for riscv64 -- see the
       # README for why. Build from AuroraBoot's own main branch instead.
+      #
+      # TEMPORARY: pinned to a fork branch carrying the fix for
+      # kairos-io/AuroraBoot#752 (raw disk generation hard-failed on riscv64
+      # with "could not find any shim file to copy") to verify it in CI
+      # before asking for it to be merged upstream. Revert this ref back to
+      # kairos-io/AuroraBoot main once #752 lands.
       - name: Checkout AuroraBoot
         uses: actions/checkout@v6
         with:
-          repository: kairos-io/AuroraBoot
+          repository: mauro-agent/AuroraBoot
+          ref: fix/riscv64-raw-efi-no-shim
           path: auroraboot-src
 
       - name: Set up Go
