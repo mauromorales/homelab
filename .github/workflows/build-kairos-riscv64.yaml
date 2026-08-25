@@ -180,24 +180,35 @@ jobs:
       # only ever emits an ISO, and this repeats the config shape
       # kairos-factory-action's own RAW step uses (see reusable-factory.yaml),
       # just running the binary directly instead of through its container.
+      #
+      # state_dir is its OWN directory (./output-raw), never ./output --
+      # mission-control#421's sibling bug, homelab#53: two AuroraBoot builds
+      # sharing one output/scratch directory has silently corrupted output
+      # before (no error logged, output just quietly wrong), and
+      # kairos-riscv64-v0.1.2's ISO stopped booting the one release this ran
+      # into the ISO step's own ./output. Not proven down to the exact byte,
+      # but it is the only structural difference between that release and
+      # the one before it that booted fine, and isolating the two is correct
+      # regardless. The finished, named .raw file still lands in ./output
+      # below, so every step after this one is unchanged.
       - name: Generate RAW artifact
         id: raw
         run: |
-          mkdir -p output
+          mkdir -p output output-raw
           sudo ./auroraboot --debug \
             --set "disable_http_server=true" \
             --set "disable_netboot=true" \
             --set "container_image=docker:kairos-riscv64:kairos" \
-            --set "state_dir=./output" \
+            --set "state_dir=./output-raw" \
             --set "disk.raw=true" \
             --set "arch=riscv64"
-          sudo chown -R "$(id -u):$(id -g)" output
+          sudo chown -R "$(id -u):$(id -g)" output-raw
           # AuroraBoot's --set mode has no --override-name equivalent for a
           # raw disk (that flag is build-iso-only), so the file it emits
           # gets renamed here to match the ISO's naming -- this is the name
           # a tester actually sees after `docker cp` extracts it, so it has
           # to carry the same k3s/version information the ISO does.
-          raw_file=$(ls output/*.raw | head -1)
+          raw_file=$(ls output-raw/*.raw | head -1)
           mv "$raw_file" "output/${{ steps.artifact.outputs.name }}.raw"
           raw_file="output/${{ steps.artifact.outputs.name }}.raw"
           sha256sum "$raw_file" | tee "${raw_file}.sha256"

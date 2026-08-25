@@ -124,10 +124,10 @@ nodes use the factory's default Kairos layering.
   `v*` tag triggers nothing.
 
 To cut a release for one node: push a `<node>-v<semver>` git tag, e.g.
-`thuroros-v1.1.2`. `release.yaml` doesn't create a GitHub Release itself, only
-the quay.io image; create the Release separately if you want one, scoped to
-the same tag. To test a node change: open a PR touching `nodes/<node>/` and
-let `build-<node>.yaml` run.
+`thuroros-v1.1.2`. `release.yaml` does create a GitHub Release (verified
+2026-08-25 against `thuroros-v1.1.2`), but with no file assets attached --
+the image itself is the artifact, published to `quay.io`. To test a node
+change: open a PR touching `nodes/<node>/` and let `build-<node>.yaml` run.
 
 ## Cross-node conventions worth knowing
 
