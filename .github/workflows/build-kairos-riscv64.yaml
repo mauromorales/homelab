@@ -1,4 +1,4 @@
-name: 'Build KairOS riscv64 image'
+name: 'Build Kairos riscv64 image'
 
 # No kairos-factory-action here, unlike every other node's workflow: its
 # reusable workflow hard-rejects any arch other than amd64/arm64
@@ -86,6 +86,26 @@ jobs:
             echo "value=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
+      # https://kairos.io/docs/reference/artifacts/'s convention:
+      # kairos-<flavor_release>-<variant>-<arch>-<model>-<version>[-k3sv<k8s_version>].
+      # variant is "standard" because this image bundles k3s (kairos-io/
+      # kairos-factory-action's reusable-factory.yaml sets variant the same
+      # way, off whether a kubernetes_distro was requested).
+      #
+      # No official k3s release exists for riscv64 yet, so there's no real
+      # "+k3sN" build number to append -- KUBERNETES_VERSION here is the
+      # upstream Kubernetes version the CARV-ICS-FORTH fork's binary actually
+      # reports (https://github.com/CARV-ICS-FORTH/k3s/releases), not a k3s
+      # release. Bump this together with kairos.Dockerfile's
+      # K3S_RISCV64_RELEASE -- the two are paired, and neither file can read
+      # the other's value.
+      - name: Determine artifact name
+        id: artifact
+        env:
+          KUBERNETES_VERSION: v1.36.3
+        run: |
+          echo "name=kairos-ubuntu-24.04-standard-riscv64-generic-${{ steps.version.outputs.value }}-k3sv${KUBERNETES_VERSION#v}" >> "$GITHUB_OUTPUT"
+
       # kairos.Dockerfile builds FROM the pushed base image
       # (kairos-riscv64-base, above), matching every other node's
       # base-then-factory split. A *locally* --load'ed image from an earlier
@@ -151,7 +171,7 @@ jobs:
           # sudo: dumping the source image's rootfs sets file ownership that
           # an unprivileged process can't Lchown.
           sudo ./auroraboot --debug build-iso --arch riscv64 --output ./output/ \
-            --override-name kairos-riscv64-ubuntu-${{ steps.version.outputs.value }} \
+            --override-name ${{ steps.artifact.outputs.name }} \
             docker:kairos-riscv64:kairos
           sudo chown -R "$(id -u):$(id -g)" output
 
@@ -172,7 +192,14 @@ jobs:
             --set "disk.raw=true" \
             --set "arch=riscv64"
           sudo chown -R "$(id -u):$(id -g)" output
+          # AuroraBoot's --set mode has no --override-name equivalent for a
+          # raw disk (that flag is build-iso-only), so the file it emits
+          # gets renamed here to match the ISO's naming -- this is the name
+          # a tester actually sees after `docker cp` extracts it, so it has
+          # to carry the same k3s/version information the ISO does.
           raw_file=$(ls output/*.raw | head -1)
+          mv "$raw_file" "output/${{ steps.artifact.outputs.name }}.raw"
+          raw_file="output/${{ steps.artifact.outputs.name }}.raw"
           sha256sum "$raw_file" | tee "${raw_file}.sha256"
           echo "path=$raw_file" >> "$GITHUB_OUTPUT"
 
@@ -204,8 +231,8 @@ jobs:
         if: ${{ inputs.release_version == '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: kairos-riscv64-ubuntu-iso-sha256
-          path: output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso.sha256
+          name: kairos-riscv64-iso-sha256
+          path: output/${{ steps.artifact.outputs.name }}.iso.sha256
           retention-days: 7
 
       - name: Publish GitHub Release
@@ -227,9 +254,9 @@ jobs:
             prerelease_flag=(--prerelease)
           fi
           gh release create "$tag" \
-            output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso \
-            output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso.sha256 \
-            --title "KairOS riscv64 v${version}" \
+            output/${{ steps.artifact.outputs.name }}.iso \
+            output/${{ steps.artifact.outputs.name }}.iso.sha256 \
+            --title "Kairos riscv64 v${version}" \
             --notes "Experimental riscv64 Kairos image. See nodes/kairos-riscv64/README.md for what this is and how to test it." \
             "${prerelease_flag[@]}"
 
