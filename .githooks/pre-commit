@@ -10,3 +10,35 @@ for branch in $protected_branches; do
     exit 1
   fi
 done
+
+# mission-control ADR-005 keeps Mauro as the commit author and makes
+# `mauro-agent` the committer, so git alone can tell agent work from his
+# own -- and that policy covers every mauromorales-account repo an agent
+# session touches, this one included. Git has no config key for the
+# committer, only the two environment variables below, and their default
+# resolves to Mauro -- so the wrong answer looks exactly like the right one
+# and nothing warns. mauromorales/homelab#51 landed with the wrong
+# committer for exactly this reason, caught only by hand after the fact
+# against other merged PRs' history.
+#
+# This fires only inside a Claude Code session. Mauro's own shell sets no
+# CLAUDECODE, so his own commits here are never touched by this check.
+if [ -n "$CLAUDECODE" ]; then
+  committer_ident=$(git var GIT_COMMITTER_IDENT)
+  committer_email=$(printf '%s' "$committer_ident" | sed -n 's/^.*<\([^>]*\)>.*$/\1/p')
+  committer_name=$(printf '%s' "$committer_ident" | sed -n 's/^\(.*\) <[^>]*>.*$/\1/p')
+  if [ "$committer_email" != "mauro-agent@mrls.xyz" ] || [ "$committer_name" != "mauro-agent" ]; then
+    echo "error: this is an agent session, so the committer must be mauro-agent." >&2
+    echo "       got: $committer_name <$committer_email>" >&2
+    echo "" >&2
+    echo "       Fix it for this one commit by prefixing the command:" >&2
+    echo "         GIT_COMMITTER_NAME=mauro-agent \\" >&2
+    echo "         GIT_COMMITTER_EMAIL=mauro-agent@mrls.xyz \\" >&2
+    echo "         git commit ..." >&2
+    echo "" >&2
+    echo "       There is no machine-wide setting for this, on purpose --" >&2
+    echo "       see mission-control's docs/runbooks/initial-setup.md ->" >&2
+    echo "       'Agent commit identity'." >&2
+    exit 1
+  fi
+fi
