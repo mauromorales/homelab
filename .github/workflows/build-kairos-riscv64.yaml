@@ -64,6 +64,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -102,10 +109,17 @@ jobs:
 
       # quay.io/kairos/auroraboot:latest is stale for riscv64 -- see the
       # README for why. Build from AuroraBoot's own main branch instead.
+      #
+      # TEMPORARY: pinned to a fork branch carrying the fix for
+      # kairos-io/AuroraBoot#752 (raw disk generation hard-failed on riscv64
+      # with "could not find any shim file to copy") to verify it in CI
+      # before asking for it to be merged upstream. Revert this ref back to
+      # kairos-io/AuroraBoot main once #752 lands.
       - name: Checkout AuroraBoot
         uses: actions/checkout@v6
         with:
-          repository: kairos-io/AuroraBoot
+          repository: mauro-agent/AuroraBoot
+          ref: fix/riscv64-raw-efi-no-shim
           path: auroraboot-src
 
       - name: Set up Go
@@ -141,6 +155,51 @@ jobs:
             docker:kairos-riscv64:kairos
           sudo chown -R "$(id -u):$(id -g)" output
 
+      # Same auroraboot binary as the ISO step, but through its top-level
+      # --set config mode instead of the build-iso subcommand -- build-iso
+      # only ever emits an ISO, and this repeats the config shape
+      # kairos-factory-action's own RAW step uses (see reusable-factory.yaml),
+      # just running the binary directly instead of through its container.
+      - name: Generate RAW artifact
+        id: raw
+        run: |
+          mkdir -p output
+          sudo ./auroraboot --debug \
+            --set "disable_http_server=true" \
+            --set "disable_netboot=true" \
+            --set "container_image=docker:kairos-riscv64:kairos" \
+            --set "state_dir=./output" \
+            --set "disk.raw=true" \
+            --set "arch=riscv64"
+          sudo chown -R "$(id -u):$(id -g)" output
+          raw_file=$(ls output/*.raw | head -1)
+          sha256sum "$raw_file" | tee "${raw_file}.sha256"
+          echo "path=$raw_file" >> "$GITHUB_OUTPUT"
+
+      # The raw image routinely runs past GitHub's 2 GiB release-asset limit,
+      # so it isn't attached to the release like the ISO is. It's published
+      # as a scratch OCI artifact on Quay instead (the same shape
+      # kairos-factory-action uses for every other node's raw builds), and
+      # pulled back out with `docker create` + `docker cp` -- see the
+      # extraction notes this workflow appends to the release below, and
+      # nodes/kairos-riscv64/README.md.
+      #
+      # Gated to release_version like the release itself, unlike the base
+      # image push above: that one is a required input to the next build
+      # step (mauromorales/homelab#43), this one is pure distribution, and a
+      # multi-GB push on every push/PR validation run would be pure waste.
+      - name: Push RAW artifact to Quay
+        if: ${{ inputs.release_version != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: nodes/kairos-riscv64/Dockerfile.img
+          platforms: linux/riscv64
+          push: true
+          tags: quay.io/mauromorales/kairos-riscv64:${{ steps.version.outputs.value }}-img
+          build-args: |
+            ARTIFACT=${{ steps.raw.outputs.path }}
+
       - name: Upload build artifact
         if: ${{ inputs.release_version == '' }}
         uses: actions/upload-artifact@v4
@@ -155,6 +214,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${{ inputs.release_version }}"
+          tag="kairos-riscv64-v${version}"
+          img_ref="quay.io/mauromorales/kairos-riscv64:${version}-img"
+          raw_sha256="$(cut -d' ' -f1 output/*.raw.sha256)"
+
           # --prerelease is a semver signal, not an "is this experimental"
           # one -- this node's own README already tells testers it's
           # experimental. Only alpha/beta/rc-suffixed versions get flagged;
@@ -163,9 +226,26 @@ jobs:
           if [[ "$version" =~ (alpha|beta|rc) ]]; then
             prerelease_flag=(--prerelease)
           fi
-          gh release create "kairos-riscv64-v${version}" \
+          gh release create "$tag" \
             output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso \
             output/kairos-riscv64-ubuntu-${{ steps.version.outputs.value }}.iso.sha256 \
             --title "KairOS riscv64 v${version}" \
             --notes "Experimental riscv64 Kairos image. See nodes/kairos-riscv64/README.md for what this is and how to test it." \
             "${prerelease_flag[@]}"
+
+          # Raw image isn't attached above -- see the "Push RAW artifact to
+          # Quay" step. Append how to get it back out.
+          {
+            printf '%s\n\n' "$(gh release view "$tag" --json body -q .body)"
+            printf '## Raw disk image\n\n'
+            printf 'A raw disk image is also published, for flashing straight to hardware without going through the ISO installer. It exceeds GitHub'"'"'s 2 GiB release-asset limit, so it is not attached here -- it is published as an OCI artifact on Quay instead:\n\n'
+            printf '`%s`\n\n' "$img_ref"
+            printf 'Extract it with Docker:\n\n'
+            printf '```bash\n'
+            printf 'export IMAGE=%s\n' "$img_ref"
+            printf 'container=$(docker create "$IMAGE" noop)   # scratch image: throwaway command, never executed\n'
+            printf 'docker cp "$container:/output/." .\n'
+            printf 'docker rm "$container"\n'
+            printf '```\n\n'
+            printf 'The `.raw` file is now in the current directory, ready to flash (`dd`, Balena Etcher, etc). SHA256: `%s`\n' "$raw_sha256"
+          } | gh release edit "$tag" --notes-file -
