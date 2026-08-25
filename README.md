@@ -55,9 +55,9 @@ Kairos Factory produces two artifacts per build:
 | ---- | ---- | ------ |
 | [ThurorOS](./nodes/thuroros/README.md) | Doorbell | ✅ 🏃 |
 | [ProtOS](./nodes/protos/README.md) | K8s Homelab | ⏸️ |
-| [KairOS](./nodes/kairos/README.md) | Kairos with debugging tools | ⏸️ |
+| [Kairos](./nodes/kairos/README.md) | Kairos with debugging tools | ⏸️ |
 | [NoOS](./nodes/noos/README.md) | Local-AI | ⏸️ |
-| [KairOS riscv64](./nodes/kairos-riscv64/README.md) | Community riscv64 hardware test image | 🔄 |
+| [Kairos riscv64](./nodes/kairos-riscv64/README.md) | Community riscv64 hardware test image | 🔄 |
 
 - ✅ Ready to be used on demand
 - 🏃‍♂️ Running 
@@ -65,7 +65,7 @@ Kairos Factory produces two artifacts per build:
 - 🔄 In development
 - ⏸️ On hold — excluded from the release pipeline pending testing
 
-Only **ThurorOS** is currently built by the [release pipeline](./.github/workflows/release.yaml); the other nodes are on hold until they have been tested. **KairOS riscv64** isn't part of that pipeline at all — Kairos Factory doesn't support riscv64 yet, so it has its own [build workflow](./.github/workflows/build-kairos-riscv64.yaml) that publishes to [GitHub Releases](../../releases) instead of `quay.io`. See [its README](./nodes/kairos-riscv64/README.md).
+Only **ThurorOS** is currently built by the [release pipeline](./.github/workflows/release.yaml); the other nodes are on hold until they have been tested. **Kairos riscv64** isn't part of that pipeline at all — Kairos Factory doesn't support riscv64 yet, so it has its own [build workflow](./.github/workflows/build-kairos-riscv64.yaml) that publishes to [GitHub Releases](../../releases) instead of `quay.io`. See [its README](./nodes/kairos-riscv64/README.md).
 
 This table is about the images I build here, not about every machine that is up. The other running machines—`midnight`, `polaris` and `homeassistant`—boot an OS that comes from somewhere else, and the hardware table above is the place to look for them.
 

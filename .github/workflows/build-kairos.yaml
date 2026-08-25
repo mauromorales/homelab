@@ -1,4 +1,4 @@
-name: 'Build KairOS image'
+name: 'Build Kairos image'
 
 on:
   push:

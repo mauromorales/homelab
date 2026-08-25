@@ -1,4 +1,4 @@
-# KairOS riscv64
+# Kairos riscv64
 
 An experimental Kairos image for **riscv64**, built so people with real riscv64
 hardware can boot it and tell me whether it works. This is not a real node in

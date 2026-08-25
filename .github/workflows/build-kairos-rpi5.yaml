@@ -1,4 +1,4 @@
-name: 'Build KairOS rpi5 image'
+name: 'Build Kairos rpi5 image'
 
 # Validates the OS-layer build (base + kairos-init) on push/PR, and builds
 # + optionally publishes a raw disk image on workflow_dispatch. No
@@ -189,6 +189,6 @@ jobs:
           gh release create "kairos-rpi5-v${version}" \
             "${{ steps.build_raw.outputs.xz_path }}" \
             "${{ steps.build_raw.outputs.xz_path }}.sha256" \
-            --title "KairOS rpi5 v${version}" \
+            --title "Kairos rpi5 v${version}" \
             --notes "Experimental, unverified Kairos image for the Raspberry Pi 5, as a compressed raw disk (.raw.xz -- decompress, then flash with dd/Etcher/Raspberry Pi Imager, same as any RPi image) rather than an ISO. The EFI partition AuroraBoot produces assumes standard UEFI firmware, which the Pi 5 doesn't have natively -- whether it actually boots via the Pi 5's own firmware/u-boot chain has NOT been confirmed on real hardware. See nodes/kairos-rpi5/README.md for what's known versus open, and report back on kairos-io/kairos#2010 either way." \
             "${prerelease_flag[@]}"
