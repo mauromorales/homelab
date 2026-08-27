@@ -413,3 +413,34 @@ stages:
       commands:
         - ln -sf /etc/systemd/system/doorbell.service /etc/systemd/system/multi-user.target.wants/doorbell.service
         - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
+    - name: "Trust fleet.home.arpa's certificate"
+      files:
+        # Public cert only, self-signed today (mauromorales/mission-control#405).
+        # Re-issuing this from an internal CA later is a content swap in this
+        # same file -- no change to how it's trusted.
+        - path: /usr/local/share/ca-certificates/fleet.home.arpa.crt
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            -----BEGIN CERTIFICATE-----
+            MIIDFTCCAf2gAwIBAgIUFRS6ztpX6c7wJQtXgxaSdtt9erYwDQYJKoZIhvcNAQEL
+            BQAwGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMB4XDTI2MDgyNzEyMjIyM1oX
+            DTM2MDgyNDEyMjIyM1owGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMIIBIjAN
+            BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5ACMCQs2Gb/ORPxJ8nlZ+X4EXLmI
+            27x5EcN9iBM6ymeMbiVy3LcWyKuvP+11uQ7+exCT2+316+esgyn1flYuNWvjx+py
+            2/tZxkajVlEe0MtJECsKjKEvPm5j1fr8AYSC/b7CXZhZR65nHvUTCv+wPns5xBFV
+            fsIoUeR/hSwEDLhDYRCMYawCHsfFEBKKGFT5mHmLT4dEl5elEI+L65iX4jquwNeh
+            PBocFij6C7PMWXxYwxZ1PI4FpnVcK8na9fLwcIryf3yjgvrUCeSZ32cAUO4suZI4
+            UYlLn9vfeoGYXiExUPIEj3MECOJWSmIaKX/5Nve0bdocmmgJbK+n88PBpwIDAQAB
+            o1MwUTAdBgNVHQ4EFgQUpSPLFhM8Ud+a1uCaujDTbKUgJTowHwYDVR0jBBgwFoAU
+            pSPLFhM8Ud+a1uCaujDTbKUgJTowDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0B
+            AQsFAAOCAQEAnpYQEh47bONIj7D3e7YG+6jTUYvWjTLRqCyXJFvfZyRGyIAsZa54
+            NJfmFACbWPXLIfxCRE5mVO6Jh0C8oba7RqwzwLSadwzxvzcGmWSxn6OU9kgfC2um
+            +rvZTH1YRFKs9dxHGUQl6m2OpxvNUnXakeSqwVuGszYQbCvkXJLbID4EzlC62E1e
+            OuhSZiYRlLvROtEsT6Ym6klCeyM70W6Ch8oGi/1Liv5U7OH/YRuQIWdFpyYSGTKB
+            wdAlYNF7fVESJetyGuYug91Q/cZ9+zvJ3mLaaRPw30i78ZIlP0g3Z8hagGbrvqh8
+            ioLR1mQ88GxKjrYGaBvCegqj986qDjebzw==
+            -----END CERTIFICATE-----
+      commands:
+        - update-ca-certificates
