@@ -418,29 +418,37 @@ stages:
         # Public cert only, self-signed today (mauromorales/mission-control#405).
         # Re-issuing this from an internal CA later is a content swap in this
         # same file -- no change to how it's trusted.
+        #
+        # Regenerated 2026-08-28 with a proper SAN (mauromorales/mission-control#482):
+        # the original had none, which Go's crypto/tls -- kairos-agent's TLS
+        # stack -- has refused to work around since Go 1.15, so registration
+        # against fleet.home.arpa failed even though this cert was already
+        # trusted. curl and OpenSSL still fall back to the CN field, which is
+        # why this looked fine from every tool except the one that mattered.
         - path: /usr/local/share/ca-certificates/fleet.home.arpa.crt
           permissions: 0644
           owner: 0
           group: 0
           content: |
             -----BEGIN CERTIFICATE-----
-            MIIDFTCCAf2gAwIBAgIUFRS6ztpX6c7wJQtXgxaSdtt9erYwDQYJKoZIhvcNAQEL
-            BQAwGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMB4XDTI2MDgyNzEyMjIyM1oX
-            DTM2MDgyNDEyMjIyM1owGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMIIBIjAN
-            BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5ACMCQs2Gb/ORPxJ8nlZ+X4EXLmI
-            27x5EcN9iBM6ymeMbiVy3LcWyKuvP+11uQ7+exCT2+316+esgyn1flYuNWvjx+py
-            2/tZxkajVlEe0MtJECsKjKEvPm5j1fr8AYSC/b7CXZhZR65nHvUTCv+wPns5xBFV
-            fsIoUeR/hSwEDLhDYRCMYawCHsfFEBKKGFT5mHmLT4dEl5elEI+L65iX4jquwNeh
-            PBocFij6C7PMWXxYwxZ1PI4FpnVcK8na9fLwcIryf3yjgvrUCeSZ32cAUO4suZI4
-            UYlLn9vfeoGYXiExUPIEj3MECOJWSmIaKX/5Nve0bdocmmgJbK+n88PBpwIDAQAB
-            o1MwUTAdBgNVHQ4EFgQUpSPLFhM8Ud+a1uCaujDTbKUgJTowHwYDVR0jBBgwFoAU
-            pSPLFhM8Ud+a1uCaujDTbKUgJTowDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0B
-            AQsFAAOCAQEAnpYQEh47bONIj7D3e7YG+6jTUYvWjTLRqCyXJFvfZyRGyIAsZa54
-            NJfmFACbWPXLIfxCRE5mVO6Jh0C8oba7RqwzwLSadwzxvzcGmWSxn6OU9kgfC2um
-            +rvZTH1YRFKs9dxHGUQl6m2OpxvNUnXakeSqwVuGszYQbCvkXJLbID4EzlC62E1e
-            OuhSZiYRlLvROtEsT6Ym6klCeyM70W6Ch8oGi/1Liv5U7OH/YRuQIWdFpyYSGTKB
-            wdAlYNF7fVESJetyGuYug91Q/cZ9+zvJ3mLaaRPw30i78ZIlP0g3Z8hagGbrvqh8
-            ioLR1mQ88GxKjrYGaBvCegqj986qDjebzw==
+            MIIDMTCCAhmgAwIBAgIUOIrQDxfxWCgsNzr1d1Liw8tUPVcwDQYJKoZIhvcNAQEL
+            BQAwGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMB4XDTI2MDgyODE0MzYyOVoX
+            DTM2MDgyNTE0MzYyOVowGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMIIBIjAN
+            BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwp+7/6QeXTCbk4wUG7DiGjMJagDS
+            vyfO6aleqNLA/Rt/fVXIm555V49XotMWaAm09xMjGnYnb/ZFVBt2cnGzKbsTqDxi
+            /9EvK2kwxMvfkriIr10W/O1drDxAWrYA+BF5HhqpS46Zx8CLbGbfMVRXmGW0Q5jL
+            j7aT8U7bqJwcWH0lDiC6g0vMLgpwhFU2zvUwR+B8tqqReunzmMK5OJ7m7MUrKmqH
+            ucqucR8gZgJo8o9n1MG7Z3etvhXLAWON4HEGfIT96LUci+L2cVgGEoQAiZxkORCG
+            vF662gKm/Sm12YqR1Tt3KLYh/Vkx5VBe/TtHqq6FdkhkKY7YQG9JT2XM7wIDAQAB
+            o28wbTAdBgNVHQ4EFgQUWESfqwpGzLa15btFHYgqjyYMenEwHwYDVR0jBBgwFoAU
+            WESfqwpGzLa15btFHYgqjyYMenEwDwYDVR0TAQH/BAUwAwEB/zAaBgNVHREEEzAR
+            gg9mbGVldC5ob21lLmFycGEwDQYJKoZIhvcNAQELBQADggEBAI7+JMbc3qDDyMBr
+            vco5529bwQzo+i8Ufq5GvroksJ0dpivQVInhdLQurBUd8nCe09vTPH72zjseCrgC
+            akBHtOwh2R4BnAC+mT2E+7wGmWwMiI6PMWBF72WoAbnkt+4DQk08tBauo9Sw0Hg9
+            XoWB3LhK9YTUy2HE3sLN7qWqaVr0hFI7B37gjGn+PJVc+P0dctBrdj19ys9oKdQX
+            FO2BzwJWq93W0Fgx++QSwaqGIHfVH37X8ivmbqgCKMskdl7R6pFYHRYwaoVluGWZ
+            vnRfLSNz8BSTaVrR1wDjid80YutIrD5gR9WIsv615vEXZTAoVKIcQW+ep+s8lK2v
+            A1vyjlk=
             -----END CERTIFICATE-----
       commands:
         - update-ca-certificates
