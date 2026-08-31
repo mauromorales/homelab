@@ -33,7 +33,12 @@ jobs:
           fetch-depth: 0
       - name: Determine version
         id: version
-        run: echo "value=$(git describe --tags --always --match 'midnight-v*' | sed 's/^midnight-//')" >> "$GITHUB_OUTPUT"
+        run: |
+          VERSION="$(git describe --tags --always --match 'midnight-v*' | sed 's/^midnight-//')"
+          if [[ "$VERSION" =~ ^[a-f0-9]+$ ]]; then
+            VERSION="v0.0.0-$VERSION"
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
