@@ -2,7 +2,18 @@
 
 Status: active. Interim OS: Fedora (scaffolding). Target OS: Kairos Ubuntu 24.04 LTS flavor (see homelab ADR-001, in the private steering repository), later Hadron.
 Role: always-on agent host for a 6-month agentic development experiment.
-Last updated: 2026-08-14.
+Last updated: 2026-08-27.
+
+## Image definition
+
+`Dockerfile` and `cloud-config.yaml` in this directory are the image
+definition, following the standard node shape (see `AGENTS.md`). CI validates
+them on every push/PR touching this node (`build-midnight.yaml`); the release
+job in `release.yaml` is on hold until the image has booted in a VM.
+
+Not built or tested yet. Tracking: [mission-control#71](https://github.com/mauromorales/mission-control/issues/71) (private).
+The persistence, upgrade and rollback contract for this image (also private)
+is mission-control ADR-012.
 
 ## Identity
 

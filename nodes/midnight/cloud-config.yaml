@@ -1,0 +1,35 @@
+#cloud-config
+
+hostname: "midnight"
+
+install:
+  auto: true
+  reboot: true
+  device: auto
+  grub_options:
+    default_menu_entry: "Midnight"
+
+users:
+  - name: "mauro"
+    groups: ["admin", "docker"]
+    ssh_authorized_keys:
+      - github:mauromorales
+
+stages:
+  initramfs:
+    - name: "Enable mDNS services to advertise hostname on local network"
+      systemctl:
+        enable:
+          - avahi-daemon
+    - name: "Mask suspend targets for unattended 24/7 operation"
+      systemctl:
+        mask:
+          - sleep.target
+          - suspend.target
+          - hibernate.target
+          - hybrid-sleep.target
+    - name: "Create the ~/src working root (see ~/src/CLAUDE.md in mission-control)"
+      commands:
+        - install -d -o mauro -g mauro -m 0755 /home/mauro/src
+        - install -d -o mauro -g mauro -m 0755 /home/mauro/src/kairos-io
+        - install -d -o mauro -g mauro -m 0755 /home/mauro/src/personal

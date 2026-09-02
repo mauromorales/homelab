@@ -41,7 +41,7 @@ Each node lives in `nodes/<name>/` and follows the same shape:
 | `noos` | Local-AI node | amd64 / `generic` | on hold |
 | `kairos-riscv64` | Community riscv64 hardware test image, not a real node | riscv64 / `generic` | experimental — see below |
 | `kairos-rpi5` | Raspberry Pi 5 hardware bring-up, not a real node | arm64 / `generic` | experimental — CI validates the OS layer only, no boot artifact yet, see below |
-| `midnight` | Always-on agent host (Beelink SER5) | amd64 | **not an image yet — see below** |
+| `midnight` | Always-on agent host (Beelink SER5) | amd64 / `generic` | on hold — image defined, not yet VM-tested, see below |
 
 "On hold" nodes are gated with `false &&` prefixed onto each job's tag-scoped
 `if:` in `release.yaml`; re-enable a node by removing the `false && ` prefix
@@ -62,13 +62,14 @@ validates that the `--model generic` OS layer builds — nothing more.
 Turning that into a bootable SD image needs the Pi 5 boot chain (u-boot,
 firmware) worked out by hand first; see `nodes/kairos-rpi5/README.md`.
 
-`midnight` is the exception to the pattern: it is **documentation-only** so far
-(`README.md`, no `Dockerfile`/`cloud-config.yaml`). It currently runs interim
-Fedora as scaffolding and targets a Kairos Ubuntu 24.04 image later; its README
-documents hardware, BIOS/boot-order, Wake-on-LAN, and PXE/fTPM specifics for
-that migration. When building its image, follow the standard two-file node shape
-above. The decision to base it on Kairos Ubuntu 24.04 is recorded in homelab
-ADR-001, which now lives in the private steering repository (see below).
+`midnight` now has an image definition (`Dockerfile` + `cloud-config.yaml`,
+the standard two-file shape). It still runs interim Fedora as scaffolding;
+the image is untested — no VM boot yet, no cutover. Its README documents
+hardware, BIOS/boot-order, Wake-on-LAN, and PXE/fTPM specifics for the
+migration. The decision to base it on Kairos Ubuntu 24.04 is recorded in
+homelab ADR-001, which now lives in the private steering repository (see
+below); the persistence, upgrade and rollback contract that narrows it is
+ADR-012, also there. Tracking: mission-control#71.
 
 ## Architecture decisions are NOT in this repository
 
