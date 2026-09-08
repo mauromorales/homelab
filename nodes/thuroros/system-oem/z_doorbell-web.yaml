@@ -1,0 +1,212 @@
+name: "thuroros: doorbell config web UI"
+stages:
+  initramfs:
+    - name: "Create doorbell config web UI script"
+      files:
+        - path: /usr/local/bin/doorbell-web
+          permissions: 0755
+          owner: 0
+          group: 0
+          content: |
+            #!/usr/bin/env python3
+            """Tiny config UI for the doorbell, served at http://thuroros.local:8080/doorbell
+
+            Lets you pick who gets notified (admin/family), change the message text,
+            and set the MQTT broker credential, all without redeploying. Writes the
+            same config file the doorbell service reads.
+            """
+            import json
+            import os
+            import html
+            from http.server import BaseHTTPRequestHandler, HTTPServer
+            from urllib.parse import parse_qs, urlparse
+
+            CONFIG_PATH = "/usr/local/doorbell/config.json"
+            DEFAULT_TO = "admin"
+            DEFAULT_MESSAGE = "🔔 Someone is at the door 🚪"
+            ALLOWED_RECIPIENTS = ["admin", "family"]
+            PORT = 8080
+
+            def read_raw_config():
+                """The full persisted config, real password included. Only for
+                do_POST's merge -- load_config()/render() must never see the
+                real password value, so the page can never echo it back out."""
+                try:
+                    with open(CONFIG_PATH) as f:
+                        return json.load(f)
+                except (FileNotFoundError, json.JSONDecodeError, OSError):
+                    return {}
+
+            def load_config():
+                cfg = read_raw_config()
+                to = cfg.get("to", DEFAULT_TO)
+                if to not in ALLOWED_RECIPIENTS:
+                    to = DEFAULT_TO
+                message = cfg.get("message") or DEFAULT_MESSAGE
+                return {
+                    "to": to,
+                    "message": message,
+                    "mqtt_user": cfg.get("mqtt_user") or "",
+                    "mqtt_password_set": bool(cfg.get("mqtt_password")),
+                }
+
+            def save_config(cfg):
+                os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+                tmp = CONFIG_PATH + ".tmp"
+                with open(tmp, "w") as f:
+                    json.dump(cfg, f, ensure_ascii=False)
+                # May hold a plaintext MQTT password (mission-control#344). Root-only,
+                # set before the rename so the file is never briefly world-readable
+                # under its final name.
+                os.chmod(tmp, 0o600)
+                os.replace(tmp, CONFIG_PATH)  # atomic
+
+            def render(cfg, saved=False):
+                options = "".join(
+                    f'<option value="{r}"{" selected" if r == cfg["to"] else ""}>{r}</option>'
+                    for r in ALLOWED_RECIPIENTS
+                )
+                banner = '<p class="ok">✅ Saved</p>' if saved else ""
+                password_placeholder = "(unchanged)" if cfg["mqtt_password_set"] else ""
+                password_hint = (
+                    "Leave blank to keep the current password."
+                    if cfg["mqtt_password_set"]
+                    else "No password set: MQTT connects anonymously."
+                )
+                return f"""<!DOCTYPE html>
+            <html lang="en">
+            <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Doorbell</title>
+            <style>
+              body {{ font-family: system-ui, sans-serif; max-width: 30rem; margin: 2rem auto; padding: 0 1rem; }}
+              label {{ display: block; margin-top: 1.2rem; font-weight: 600; }}
+              select, input[type=text] {{ width: 100%; padding: .55rem; font-size: 1rem; box-sizing: border-box; margin-top: .3rem; }}
+              button {{ margin-top: 1.5rem; padding: .6rem 1.2rem; font-size: 1rem; cursor: pointer; }}
+              .ok {{ color: #157347; font-weight: 600; }}
+              .hint {{ color: #666; font-size: .85rem; margin-top: .3rem; }}
+              .secondary {{ background: none; border: none; color: #666; text-decoration: underline; padding: 0; margin-top: 1rem; font-size: .9rem; }}
+            </style>
+            </head>
+            <body>
+            <h1>🔔 Doorbell</h1>
+            {banner}
+            <form method="post" action="/doorbell">
+              <label for="to">Send notifications to</label>
+              <select id="to" name="to">{options}</select>
+
+              <label for="message">Message</label>
+              <input type="text" id="message" name="message" value="{html.escape(cfg["message"])}">
+              <p class="hint">Default: {html.escape(DEFAULT_MESSAGE)}</p>
+
+              <label for="mqtt_user">MQTT username</label>
+              <input type="text" id="mqtt_user" name="mqtt_user" value="{html.escape(cfg["mqtt_user"])}">
+              <p class="hint">Blank means an anonymous MQTT connection.</p>
+
+              <label for="mqtt_password">MQTT password</label>
+              <input type="password" id="mqtt_password" name="mqtt_password" value="" placeholder="{password_placeholder}">
+              <p class="hint">{password_hint}</p>
+
+              <button type="submit">Save</button>
+            </form>
+            <form method="post" action="/doorbell">
+              <input type="hidden" name="reset" value="1">
+              <button type="submit" class="secondary">Reset message to default</button>
+            </form>
+            </body>
+            </html>"""
+
+            class Handler(BaseHTTPRequestHandler):
+                def _html(self, body, status=200):
+                    data = body.encode("utf-8")
+                    self.send_response(status)
+                    self.send_header("Content-Type", "text/html; charset=utf-8")
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+
+                def do_GET(self):
+                    parsed = urlparse(self.path)
+                    if parsed.path.rstrip("/") in ("", "/doorbell"):
+                        saved = parse_qs(parsed.query).get("saved", ["0"])[0] == "1"
+                        self._html(render(load_config(), saved))
+                    else:
+                        self.send_error(404)
+
+                def do_POST(self):
+                    if urlparse(self.path).path.rstrip("/") != "/doorbell":
+                        self.send_error(404)
+                        return
+                    length = int(self.headers.get("Content-Length", 0))
+                    form = parse_qs(self.rfile.read(length).decode("utf-8"), keep_blank_values=True)
+                    # The raw file, real password included -- never load_config()'s
+                    # sanitized view, which drops the password on purpose.
+                    cfg = read_raw_config()
+                    if form.get("reset", ["0"])[0] == "1":
+                        cfg["message"] = DEFAULT_MESSAGE
+                    else:
+                        to = form.get("to", [cfg.get("to", DEFAULT_TO)])[0]
+                        if to in ALLOWED_RECIPIENTS:
+                            cfg["to"] = to
+                        message = form.get("message", [cfg.get("message", DEFAULT_MESSAGE)])[0].strip()
+                        cfg["message"] = message or DEFAULT_MESSAGE
+
+                        mqtt_user = form.get("mqtt_user", [cfg.get("mqtt_user", "")])[0].strip()
+                        if mqtt_user:
+                            cfg["mqtt_user"] = mqtt_user
+                            mqtt_password = form.get("mqtt_password", [""])[0]
+                            if mqtt_password:
+                                # Blank means "leave the current password alone" --
+                                # it is never echoed into the form, so blank is not
+                                # distinguishable from "untouched".
+                                cfg["mqtt_password"] = mqtt_password
+                        else:
+                            # No username means no auth; drop both so a stale
+                            # password can never linger for a username that no
+                            # longer exists.
+                            cfg.pop("mqtt_user", None)
+                            cfg.pop("mqtt_password", None)
+                    save_config(cfg)
+                    # Post/Redirect/Get so a refresh doesn't resubmit
+                    self.send_response(303)
+                    self.send_header("Location", "/doorbell?saved=1")
+                    self.end_headers()
+
+                def log_message(self, fmt, *args):
+                    print("%s - %s" % (self.address_string(), fmt % args))
+
+            def main():
+                server = HTTPServer(("0.0.0.0", PORT), Handler)
+                print(f"🌐 Doorbell config UI listening on :{PORT}/doorbell")
+                server.serve_forever()
+
+            if __name__ == "__main__":
+                main()
+    - name: "Add doorbell config web UI service"
+      files:
+        - path: /etc/systemd/system/doorbell-web.service
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            [Unit]
+            Description=Doorbell config web UI
+            Wants=network-online.target
+            After=network-online.target
+
+            [Service]
+            Type=simple
+            Environment=PYTHONUNBUFFERED=1
+            ExecStart=/usr/local/bin/doorbell-web
+            Restart=always
+            RestartSec=2
+            SyslogIdentifier=doorbell-web
+            StandardOutput=journal
+            StandardError=journal
+
+            [Install]
+            WantedBy=multi-user.target
+    - name: "Enable doorbell config web UI service"
+      commands:
+        - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service

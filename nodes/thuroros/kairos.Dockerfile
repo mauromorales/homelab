@@ -28,3 +28,15 @@ RUN --mount=type=bind,from=kairos-init,src=/kairos-init,dst=/kairos-init \
     if [ "$FIPS" == "fips" ]; then FIPS_FLAG="--fips"; else FIPS_FLAG=""; fi; \
     eval /kairos-init -l debug -s install -m \"${MODEL}\" -t \"${TRUSTED_BOOT}\" ${K8S_FLAG} ${K8S_VERSION_FLAG} --version \"${VERSION}\" \"${FIPS_FLAG}\" && \
     eval /kairos-init -l debug -s init -m \"${MODEL}\" -t \"${TRUSTED_BOOT}\" ${K8S_FLAG} ${K8S_VERSION_FLAG} --version \"${VERSION}\" \"${FIPS_FLAG}\"
+
+# Node-specific cloud-config fragments, baked into the image itself instead of
+# the OEM partition (mission-control#541): kairos-agent reads /system/oem
+# before /oem, and /system/oem lives inside this image, so these refresh on
+# every upgrade -- /oem only gets written at install/reflash time
+# (mission-control#532). Filenames are letter-prefixed (z_*), never numeric:
+# kairos-init's own bundled fragments here are strictly two-digit-numeric
+# (00_rootfs.yaml, 08_grub.yaml, ...), and files in one directory merge in
+# plain lexical order (kairos-sdk/collector, filepath.Walk), so a letter
+# prefix sorts after anything kairos-init could ever add without needing to
+# guess or reserve a numeric range.
+COPY nodes/thuroros/system-oem/*.yaml /system/oem/

@@ -52,8 +52,11 @@ no static IPs.
 ### thuroros (this node)
 
 A Kairos image (Ubuntu 22.04 base, `rpi4` model) that self-configures on first
-boot from [`cloud-config.yaml`](./cloud-config.yaml). It runs two systemd
-services:
+boot. [`cloud-config.yaml`](./cloud-config.yaml) holds what's genuinely
+install-time/per-instance (hostname, users); everything else lives as
+per-concern fragments under [`system-oem/`](./system-oem/), baked into
+`/system/oem` at image build time (see "Cloud-config layout" below for why).
+It runs two systemd services:
 
 - **`doorbell`** — a Python script (`lgpio`) that monitors GPIO pin 23. On a
   press it reads the current recipient and message from the config file and
@@ -144,7 +147,36 @@ with no username is meaningless.
   button handler; it logs a timeout and keeps running. The MQTT publish has the
   same shape: a 5s socket timeout, caught and logged, never raised, so a broker
   outage cannot freeze the button handler either.
-- **Deployment:** changes to `cloud-config.yaml` trigger an image rebuild
-  ([`build-thuroros.yaml`](../../.github/workflows/build-thuroros.yaml)); the
-  new image is flashed or upgraded onto the Pi. Releases are cut by tagging
-  (see [`release.yaml`](../../.github/workflows/release.yaml)).
+- **Deployment:** changes to `cloud-config.yaml` or `system-oem/` trigger an
+  image rebuild
+  ([`build-thuroros.yaml`](../../.github/workflows/build-thuroros.yaml)).
+  `system-oem/` fragments reach an already-installed Pi via a plain
+  `kairos-agent upgrade`, since they're baked into the image. `cloud-config.yaml`
+  does not: it lands on `COS_OEM`, which is only written at install/reflash
+  time (`kairos-agent upgrade` never touches it, mission-control#532) — a
+  change there needs a reflash to actually reach an existing node. Releases
+  are cut by tagging (see [`release.yaml`](../../.github/workflows/release.yaml)).
+
+## Cloud-config layout
+
+Two places, two different lifetimes, both read by `kairos-agent`
+(`agent/pkg/constants/constants.go`'s `GetCloudInitPaths()`, checked
+2026-08-30 against `kairos-io/kairos`):
+
+- **`cloud-config.yaml`** → `COS_OEM` (`/oem`). Written once, at install or
+  reflash. Use this only for what's genuinely per-instance and not expected
+  to change without a reflash anyway (hostname, users).
+- **`system-oem/*.yaml`** → `/system/oem`, baked into the image itself by
+  [`kairos.Dockerfile`](./kairos.Dockerfile)'s `COPY` step. Refreshes on
+  every `kairos-agent upgrade`, no reflash needed. Use this for everything
+  else — services, scripts, certs, anything that should actually take effect
+  the next time the node upgrades.
+
+**Naming: always a letter prefix (`z_...`), never a number.** `kairos-init`
+ships its own bundled fragments in the same `/system/oem` directory, strictly
+two-digit-numeric-named (`00_rootfs.yaml` ... `52_installer.yaml` as of
+2026-08-30 — already past the `50s`, which is why a reserved numeric range
+doesn't work). Every file in the directory merges in plain lexical order
+(`kairos-sdk/collector`, `filepath.Walk`), and ASCII digits sort before ASCII
+letters, so a letter-prefixed file sorts after anything `kairos-init` could
+ever add, with no range to reserve or renegotiate on every version bump.
