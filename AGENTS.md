@@ -42,6 +42,7 @@ Each node lives in `nodes/<name>/` and follows the same shape:
 | `kairos-riscv64` | Community riscv64 hardware test image, not a real node | riscv64 / `generic` | experimental — see below |
 | `kairos-rpi5` | Raspberry Pi 5 hardware bring-up, not a real node | arm64 / `generic` | experimental — CI validates the OS layer only, no boot artifact yet, see below |
 | `midnight` | Always-on agent host (Beelink SER5) | amd64 | **not an image yet — see below** |
+| `hegemon` | K8s control plane (HP ProDesk 600 G4) | amd64 / Hadron | **not built here — see below** |
 
 "On hold" nodes are gated with `false &&` prefixed onto each job's tag-scoped
 `if:` in `release.yaml`; re-enable a node by removing the `false && ` prefix

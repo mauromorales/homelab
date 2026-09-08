@@ -1,0 +1,19 @@
+#cloud-config
+
+hostname: "hegemon"
+
+install:
+  auto: true
+  reboot: true
+  device: auto
+  grub_options:
+    default_menu_entry: "Hegemon"
+
+users:
+  - name: "mauro"
+    groups: ["admin"]
+    ssh_authorized_keys:
+      - github:mauromorales
+
+k0s:
+  enabled: true
