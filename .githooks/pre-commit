@@ -11,10 +11,10 @@ for branch in $protected_branches; do
   fi
 done
 
-# mission-control ADR-005 keeps Mauro as the commit author and makes
-# `mauro-agent` the committer, so git alone can tell agent work from his
-# own -- and that policy covers every mauromorales-account repo an agent
-# session touches, this one included. Git has no config key for the
+# Policy keeps Mauro as the commit author and makes `mauro-agent` the
+# committer, so git alone can tell agent work from his own -- and that
+# policy covers every mauromorales-account repo an agent session touches,
+# this one included. Git has no config key for the
 # committer, only the two environment variables below, and their default
 # resolves to Mauro -- so the wrong answer looks exactly like the right one
 # and nothing warns. mauromorales/homelab#51 landed with the wrong
@@ -37,8 +37,7 @@ if [ -n "$CLAUDECODE" ]; then
     echo "         git commit ..." >&2
     echo "" >&2
     echo "       There is no machine-wide setting for this, on purpose --" >&2
-    echo "       see mission-control's docs/runbooks/initial-setup.md ->" >&2
-    echo "       'Agent commit identity'." >&2
+    echo "       set the two variables above for each agent commit." >&2
     exit 1
   fi
 fi

@@ -182,8 +182,8 @@ jobs:
       # just running the binary directly instead of through its container.
       #
       # state_dir is its OWN directory (./output-raw), never ./output --
-      # mission-control#421's sibling bug, homelab#53: two AuroraBoot builds
-      # sharing one output/scratch directory has silently corrupted output
+      # homelab#53: two AuroraBoot builds sharing one output/scratch
+      # directory has silently corrupted output
       # before (no error logged, output just quietly wrong), and
       # kairos-riscv64-v0.1.2's ISO stopped booting the one release this ran
       # into the ISO step's own ./output. Not proven down to the exact byte,
