@@ -4,9 +4,6 @@ Status: active. OS: macOS.
 Role: unattended service host. Runs `mowa` (mauromorales/mowa) as a launchd agent, nobody at the keyboard.
 Last updated: 2026-08-28.
 
-Private counterpart with the full setup detail: `docs/runbooks/polaris-service-host.md`
-in the steering repository (mission-control, private).
-
 ## Why an "agent," not a "daemon"
 
 `mowa` needs a GUI login session, so it installs as a launchd **agent**, not a

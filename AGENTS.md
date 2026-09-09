@@ -120,8 +120,8 @@ nodes use the factory's default Kairos layering.
   ephemeral. Use these to validate a change to a Dockerfile or cloud-config.
 - `.github/workflows/release.yaml` — **releases**, triggered by pushing a
   `<node>-v*` tag. Builds and publishes a durable image for that one node.
-  Each node versions and releases independently (mission-control#352); a bare
-  `v*` tag triggers nothing.
+  Each node versions and releases independently; a bare `v*` tag triggers
+  nothing.
 
 To cut a release for one node: push a `<node>-v<semver>` git tag, e.g.
 `thuroros-v1.1.2`. `release.yaml` does create a GitHub Release (verified
