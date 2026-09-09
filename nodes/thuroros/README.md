@@ -13,11 +13,13 @@ and a real entity with history.
 ```mermaid
 flowchart LR
     button([Doorbell button]) -->|GPIO 23| doorbell
-    me([Me / browser]) -.->|set recipient + text| webui
+    me([Me / browser]) -.->|set recipient + text| proxy
 
     subgraph thuroros["thuroros · Raspberry Pi 4 (Kairos)"]
         doorbell["doorbell service<br/>(Python + lgpio)"]
+        proxy["nginx :80<br/>reverse proxy"]
         webui["doorbell-web<br/>config UI :8080"]
+        proxy -->|proxy_pass| webui
         config[("config.json<br/>/usr/local/doorbell")]
         webui -->|writes| config
         config -->|read on press| doorbell
@@ -47,12 +49,20 @@ All three hosts advertise on the LAN over mDNS (avahi / Bonjour), so `thuroros`
 reaches mowa at `polaris.local` and Home Assistant at `homeassistant.local`:
 no static IPs.
 
+mDNS is the right tool for those two calls, which `thuroros` makes itself. It is
+a weaker choice for reaching the config page from a browser, because mDNS needs
+multicast to work between the browser's host and this node, and a mesh network
+does not always carry multicast between every pair of devices. For that reason
+the config page is served by nginx on port 80, and is best reached through a
+normal DNS name pointed at this node. Unicast DNS crosses a mesh where multicast
+may not.
+
 ## The two nodes
 
 ### thuroros (this node)
 
 A Kairos image (Ubuntu 22.04 base, `rpi4` model) that self-configures on first
-boot from [`cloud-config.yaml`](./cloud-config.yaml). It runs two systemd
+boot from [`cloud-config.yaml`](./cloud-config.yaml). It runs three systemd
 services:
 
 - **`doorbell`** — a Python script (`lgpio`) that monitors GPIO pin 23. On a
@@ -63,9 +73,13 @@ services:
   Home Assistant over MQTT (see below), independently: a broker outage cannot
   affect the iMessage path, and a Messages wedge cannot affect MQTT.
 - **`doorbell-web`** — a tiny stdlib HTTP server on `:8080` serving a config
-  page at `http://thuroros.local:8080/doorbell`. It lets me switch the recipient
-  between the `admin` and `family` groups and change the message text without
-  rebuilding the image.
+  page at `/doorbell`. It lets me switch the recipient between the `admin` and
+  `family` groups and change the message text without rebuilding the image.
+- **`nginx`** — a reverse proxy on `:80` in front of `doorbell-web`, so the page
+  is reachable at `/` on a plain hostname with no port to remember. `/` redirects
+  to `/doorbell`, because `doorbell-web` serves nothing at the root. The site
+  matches any hostname (`server_name _`), so pointing a new DNS name at this node
+  needs no image rebuild. Port `8080` still works and is unchanged.
 
 Both share `/usr/local/doorbell/config.json` — a Kairos persistent path, so it
 survives reboots and image upgrades. `doorbell-web` writes it; `doorbell` reads
@@ -131,7 +145,7 @@ can hold a plaintext credential.
 - **`mqtt_user`** / **`mqtt_password`** (optional): only needed if the Mosquitto
   broker requires authentication. Unset means an anonymous MQTT connection.
 
-Everything above changes at `http://thuroros.local:8080/doorbell`. The password
+Everything above changes on the config page, at `/` on this node. The password
 field is never pre-filled with the current value, a blank submit leaves it
 unchanged; clearing the username drops both fields together, since a password
 with no username is meaningless.
