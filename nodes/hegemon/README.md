@@ -81,6 +81,12 @@ TLS verification.
 - **Day-2 tooling** — AuroraBoot fleet vs. `kairos-operator`, once this node
   is a cluster member with something to reconcile.
 - **Ingress and secrets** for whatever runs on the cluster.
+- **`hegemon.local` doesn't resolve.** Every other node here uses mDNS
+  (`avahi-daemon` + `libnss-mdns`, per the top-level `CLAUDE.md`/`AGENTS.md`
+  discovery convention), but this node runs an upstream Hadron image with no
+  package manager, so nothing installs those tools. Reach it by IP or via
+  `fleet.home.arpa` for now. Fixing this needs either bundling avahi into a
+  future custom Hadron build for this node, or a static DNS entry.
 
 Nothing above is baked into `cloud-config.yaml` yet, on purpose: none of it is
 decided.
