@@ -17,3 +17,6 @@ users:
 
 k0s:
   enabled: true
+  args:
+    - --enable-worker
+    - --no-taints

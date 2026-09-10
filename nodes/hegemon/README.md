@@ -1,9 +1,18 @@
 # Hegemon
 
-The k0s cluster's control plane. An HP ProDesk 600 G4 Mini (`hegemon`): the
-ProDesk runs the control plane, `helios` (the Z4 G4) joins as its worker.
+The k0s cluster's control plane. An HP ProDesk 600 G4 Mini (`hegemon`).
 Hosted control planes (k0smotron) stay deferred for now, so this is a plain
 single control plane, not a hosted one.
+
+**Temporary single-node shape.** `helios` (the Z4 G4) is the intended worker,
+but it is blocked on a manual NVIDIA driver install that has to happen first
+(see [homelab ADR-012](https://github.com/mauromorales/mission-control/blob/main/docs/adr/homelab/ADR-012-node-os-flavor-per-role.md)
+and [mission-control#150](https://github.com/mauromorales/mission-control/issues/150)).
+Rather than wait, `hegemon` runs as control plane **and** worker so the
+cluster is usable at a smaller scale in the meantime. When `helios` is ready
+to join, drop the `--enable-worker`/`--no-taints` args below and cut hegemon
+back to controller-only, matching every other multi-node k0s config in this
+repo (`noos`, `protos`).
 
 The name follows the lab's own: `hegemon` (ἡγεμών, "leader, the one who
 commands") is the direct root of *Hegemonikon*, this repo's own name.
@@ -42,8 +51,8 @@ by tag). Check what's actually deployed before assuming a specific version.
 
 ## Cluster role
 
-`k0s: enabled: true` with no `--enable-worker` arg. Controller only —
-`hegemon` does not schedule workloads; `helios` is the worker for that.
+`k0s: enabled: true` with `--enable-worker` and `--no-taints`. Control plane
+and worker on one node, for now — see the temporary-shape note above.
 
 ## Installing it
 
