@@ -35,12 +35,17 @@ architecture, model, k0s version) already covers everything `hegemon` needs,
 so there's nothing homelab-specific to add.
 
 This node runs a **Hadron**-based image, not the Ubuntu-based flavor
-`protos`/`thuroros` use. Hadron ships no package manager — everything has to
-be baked into the image or run as a container. `hegemon` doesn't need
-anything baked in beyond what the fleet server's plain `Hadron` + k0s
-template already produces, so a custom Factory build in this repo would add
-a second image pipeline for no gain. This `cloud-config.yaml` is all the
-customization the node needs: hostname, an SSH user, and `k0s: enabled: true`.
+`protos`/`thuroros` use. Hadron ships no package manager — new software has to
+be baked into the image or run as a container. That doesn't reach CA trust,
+though: `update-ca-certificates` ships in the base Hadron image itself (see
+upstream [kairos-io/hadron's
+README](https://github.com/kairos-io/hadron#adding-custom-ca-certificates)),
+so the same `files:`/`commands:` pattern `thuroros` uses works here too.
+`hegemon` doesn't need anything else baked in beyond what the fleet server's
+plain `Hadron` + k0s template already produces, so a custom Factory build in
+this repo would add a second image pipeline for no gain. This
+`cloud-config.yaml` is all the customization the node needs: hostname, an SSH
+user, `k0s` config, and trust for `fleet.home.arpa`'s certificate.
 
 **Consequence:** the exact `kairos-init` version baked into the image is
 whatever's pinned in the AuroraBoot instance building it, not anything this
@@ -63,6 +68,12 @@ over PXE:
 3. AuroraBoot answers the PXE request over ProxyDHCP — it does not run its
    own DHCP server, so this works alongside the household router without a
    separate isolated network segment.
+
+`fleet.home.arpa` is self-signed today, and `cloud-config.yaml` trusts it the
+same way `thuroros` does (`nodes/thuroros/cloud-config.yaml`): a
+`files`/`update-ca-certificates` step under `stages.initramfs`. Without it,
+`kairos-agent`'s registration back to the fleet server after install fails
+TLS verification.
 
 ## Still open
 
