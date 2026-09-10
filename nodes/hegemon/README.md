@@ -5,9 +5,7 @@ Hosted control planes (k0smotron) stay deferred for now, so this is a plain
 single control plane, not a hosted one.
 
 **Temporary single-node shape.** `helios` (the Z4 G4) is the intended worker,
-but it is blocked on a manual NVIDIA driver install that has to happen first
-(see [homelab ADR-012](https://github.com/mauromorales/mission-control/blob/main/docs/adr/homelab/ADR-012-node-os-flavor-per-role.md)
-and [mission-control#150](https://github.com/mauromorales/mission-control/issues/150)).
+but it needs a manual NVIDIA driver install first, and that is not done yet.
 Rather than wait, `hegemon` runs as control plane **and** worker so the
 cluster is usable at a smaller scale in the meantime. When `helios` is ready
 to join, drop the `--enable-worker`/`--no-taints` args below and cut hegemon
