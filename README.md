@@ -18,14 +18,14 @@ This lab is my personal sandbox for exploring OS design, Kubernetes architecture
 | Device | Name | Role in Lab | Status | CPU | GPU | Memory | Storage |
 | ------ | ---- | ----------- | ------ | --- | --- | ------ | ------- |
 | Beelink SER5 | [`midnight`](./nodes/midnight/README.md) | Always-on agent host | Running | Ryzen 7 5825U, 8C/16T | Radeon (integrated) | 64 GB DDR4-3200 | 1 TB NVMe SSD |
-| HP ProDesk 600 G4 Mini | TBC | Control Plane | Planned | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
+| HP ProDesk 600 G4 Mini | [`hegemon`](./nodes/hegemon/README.md) | Control Plane | Planned | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
 | HP Z4 G4 | `helios` | Worker (GPU) | Planned | Xeon W-2235, 6C/12T | Quadro RTX 4000 8GB | 64 GB DDR4 ECC | 512 GB SSD |
 | Mac Mini | `polaris` | iCloud Supporting Services | Running | M2 | M2 | 8G | 256 GB SSD |
 | Raspberry Pi 4 | [`thuroros`](./nodes/thuroros/README.md) | Doorbell relay | Running | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
 | Raspberry Pi 4 | `homeassistant` | Home Assistant host | Running | ARM Cortex-A72 | Whatever comes in the Pi | 8G | USB SSD |
 | Raspberry Pi 5 | TBC | Not yet assigned | Spare | ARM Cortex-A76 | Whatever comes in the Pi | TBC | TBC |
 
-Four machines are up today: `midnight`, `polaris`, `thuroros` and `homeassistant`. Only `thuroros` runs an OS built from this repository—`midnight` runs Fedora as scaffolding while its Kairos image is built, `polaris` runs macOS, and `homeassistant` runs Home Assistant OS.
+Four machines are up today: `midnight`, `polaris`, `thuroros` and `homeassistant`. Only `thuroros` runs an OS built from this repository—`midnight` runs Fedora as scaffolding while its Kairos image is built, `polaris` runs macOS, and `homeassistant` runs Home Assistant OS. `hegemon` (planned) is a third case: it boots an upstream Kairos image unmodified, with only a `cloud-config.yaml` from this repo—see [its README](./nodes/hegemon/README.md).
 
 ## Platform Infrastructure
 
@@ -80,7 +80,7 @@ I run **[K0s](https://k0sproject.io)** for its simplicity and architectural choi
 
 I like the clean separation of control-plane components and the way their tokenization system works. The makers of K0s also created [K0smotron](https://github.com/k0smotron/k0smotron), their implementation of Hosted Control Planes, which I’d like to experiment with in the future.
 
-For now, I stick to the defaults that come with K0s to keep the learning curve smooth: the ProDesk runs the control plane, and `helios` joins as its worker.
+For now, I stick to the defaults that come with K0s to keep the learning curve smooth: `hegemon` runs the control plane, and `helios` joins as its worker.
 
 ### Supporting Services
 
