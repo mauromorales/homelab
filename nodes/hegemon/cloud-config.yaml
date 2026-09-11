@@ -14,6 +14,14 @@ users:
     groups: ["admin"]
     ssh_authorized_keys:
       - github:mauromorales
+  - name: "mauro-agent"
+    groups: ["admin"]
+    ssh_authorized_keys:
+      # midnight's own key (~/.ssh/id_ed25519.midnight there), pasted
+      # directly rather than via a github: lookup -- for an automation
+      # identity there's no rotation benefit to the indirection, since
+      # Kairos only fetches github: keys once, at build time.
+      - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOG3waxPIieQPfa+iTVQ2WLZsO8oRnbPx6NIUecK3LoU mauro@midnight"
 
 k0s:
   enabled: true
