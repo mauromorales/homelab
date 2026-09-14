@@ -183,7 +183,8 @@ stages:
           group: 0
           content: |
             #!/usr/bin/env python3
-            """Tiny config UI for the doorbell, served at http://thuroros.local:8080/doorbell
+            """Tiny config UI for the doorbell, served on :8080 at /doorbell and
+            fronted by nginx on port 80, where / redirects to /doorbell.
 
             Lets you pick who gets notified (admin/family), change the message text,
             and set the MQTT broker credential, all without redeploying. Writes the
@@ -413,6 +414,45 @@ stages:
       commands:
         - ln -sf /etc/systemd/system/doorbell.service /etc/systemd/system/multi-user.target.wants/doorbell.service
         - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
+    - name: "Add the doorbell reverse proxy"
+      files:
+        - path: /etc/nginx/sites-available/doorbell.conf
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            # doorbell-web listens on :8080 and answers only on /doorbell. This
+            # proxy puts it on port 80 at /, so the node is reachable by a plain
+            # hostname with no port and no path to remember.
+            #
+            # server_name is "_" on purpose. The name this node answers to is a
+            # DNS record that lives outside this repository, and it has changed
+            # before. Matching any name means a rename needs no image rebuild.
+            server {
+                listen 80 default_server;
+                listen [::]:80 default_server;
+                server_name _;
+
+                # doorbell-web returns 404 for /, so send the bare hostname to the
+                # page that does exist rather than showing an error.
+                location = / {
+                    return 302 /doorbell;
+                }
+
+                location / {
+                    proxy_pass http://127.0.0.1:8080;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+    - name: "Enable the doorbell reverse proxy"
+      commands:
+        # Ubuntu's nginx package ships a default site that also claims port 80.
+        - rm -f /etc/nginx/sites-enabled/default
+        - ln -sf /etc/nginx/sites-available/doorbell.conf /etc/nginx/sites-enabled/doorbell.conf
+        - ln -sf /lib/systemd/system/nginx.service /etc/systemd/system/multi-user.target.wants/nginx.service
     - name: "Trust fleet.home.arpa's certificate"
       files:
         # Public cert only, self-signed today. Re-issuing this from an
