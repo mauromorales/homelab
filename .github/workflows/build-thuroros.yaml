@@ -34,7 +34,7 @@ jobs:
       version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # "auto" (the factory action's own version resolution) runs an

@@ -34,7 +34,7 @@ jobs:
       version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Determine version
         id: version
         run: echo "value=${GITHUB_REF_NAME#kairos-}" >> "$GITHUB_OUTPUT"
@@ -62,7 +62,7 @@ jobs:
       version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Determine version
         id: version
         run: echo "value=${GITHUB_REF_NAME#protos-}" >> "$GITHUB_OUTPUT"
@@ -90,7 +90,7 @@ jobs:
       version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Determine version
         id: version
         run: echo "value=${GITHUB_REF_NAME#thuroros-}" >> "$GITHUB_OUTPUT"
@@ -118,7 +118,7 @@ jobs:
       version: ${{ steps.version.outputs.value }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Determine version
         id: version
         run: echo "value=${GITHUB_REF_NAME#noos-}" >> "$GITHUB_OUTPUT"
