@@ -95,6 +95,10 @@ Existing runbooks:
 - [`docs/ha-os-rpi4-boot.md`](docs/ha-os-rpi4-boot.md) — diagnosing a Home
   Assistant OS boot on the Raspberry Pi 4, and the display-handover failure
   that makes a healthy board look dead.
+- [`docs/ha-adguard-dns.md`](docs/ha-adguard-dns.md) — the AdGuard Home add-on
+  that serves DNS for the whole house: which settings matter, why a `0.0.0.0`
+  block stalls a browser instead of failing it, and why Chrome cannot be used
+  to diagnose it.
 
 ## Build pipeline (all builds happen in GitHub Actions)
 
