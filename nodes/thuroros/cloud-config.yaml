@@ -230,8 +230,8 @@ stages:
                 tmp = CONFIG_PATH + ".tmp"
                 with open(tmp, "w") as f:
                     json.dump(cfg, f, ensure_ascii=False)
-                # May hold a plaintext MQTT password (mission-control#344). Root-only,
-                # set before the rename so the file is never briefly world-readable
+                # May hold a plaintext MQTT password. Root-only, set before
+                # the rename so the file is never briefly world-readable
                 # under its final name.
                 os.chmod(tmp, 0o600)
                 os.replace(tmp, CONFIG_PATH)  # atomic
@@ -414,6 +414,27 @@ stages:
       commands:
         - ln -sf /etc/systemd/system/doorbell.service /etc/systemd/system/multi-user.target.wants/doorbell.service
         - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
+    - name: "Generate a self-signed certificate for doorbell.home.arpa"
+      commands:
+        # Server cert for this node's own nginx, not a cert this node trusts
+        # (that's the fleet.home.arpa stage below). The key never leaves the
+        # Pi and is never committed here -- generated once, on first boot,
+        # into /etc, which Kairos persists as an overlay across reboots and
+        # upgrades. A rebuild or a re-flash makes a new one.
+        #
+        # Whoever wants other machines to stop warning about this cert reads
+        # it back off the Pi (/etc/ssl/certs/doorbell.home.arpa.crt) and adds
+        # it to those machines' trust stores by hand, the same one-time step
+        # already done for fleet.home.arpa in this file.
+        - |
+          if [ ! -f /etc/ssl/certs/doorbell.home.arpa.crt ]; then
+            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+              -keyout /etc/ssl/private/doorbell.home.arpa.key \
+              -out /etc/ssl/certs/doorbell.home.arpa.crt \
+              -subj "/CN=doorbell.home.arpa" \
+              -addext "subjectAltName=DNS:doorbell.home.arpa"
+            chmod 600 /etc/ssl/private/doorbell.home.arpa.key
+          fi
     - name: "Add the doorbell reverse proxy"
       files:
         - path: /etc/nginx/sites-available/doorbell.conf
@@ -422,8 +443,10 @@ stages:
           group: 0
           content: |
             # doorbell-web listens on :8080 and answers only on /doorbell. This
-            # proxy puts it on port 80 at /, so the node is reachable by a plain
-            # hostname with no port and no path to remember.
+            # proxy puts it at / on 443 over HTTPS, so the node is reachable by
+            # a plain hostname with no port and no path to remember, and the
+            # MQTT/doorbell config the page writes doesn't cross the LAN in
+            # plaintext.
             #
             # server_name is "_" on purpose. The name this node answers to is a
             # DNS record that lives outside this repository, and it has changed
@@ -432,6 +455,17 @@ stages:
                 listen 80 default_server;
                 listen [::]:80 default_server;
                 server_name _;
+
+                return 301 https://$host$request_uri;
+            }
+
+            server {
+                listen 443 ssl default_server;
+                listen [::]:443 ssl default_server;
+                server_name _;
+
+                ssl_certificate     /etc/ssl/certs/doorbell.home.arpa.crt;
+                ssl_certificate_key /etc/ssl/private/doorbell.home.arpa.key;
 
                 # doorbell-web returns 404 for /, so send the bare hostname to the
                 # page that does exist rather than showing an error.
@@ -455,12 +489,12 @@ stages:
         - ln -sf /lib/systemd/system/nginx.service /etc/systemd/system/multi-user.target.wants/nginx.service
     - name: "Trust fleet.home.arpa's certificate"
       files:
-        # Public cert only, self-signed today (mauromorales/mission-control#405).
+        # Public cert only, self-signed today.
         # Re-issuing this from an internal CA later is a content swap in this
         # same file -- no change to how it's trusted.
         #
-        # Regenerated 2026-08-28 with a proper SAN (mauromorales/mission-control#482):
-        # the original had none, which Go's crypto/tls -- kairos-agent's TLS
+        # Regenerated 2026-08-28 with a proper SAN: the original had none,
+        # which Go's crypto/tls -- kairos-agent's TLS
         # stack -- has refused to work around since Go 1.15, so registration
         # against fleet.home.arpa failed even though this cert was already
         # trusted. curl and OpenSSL still fall back to the CN field, which is
@@ -492,3 +526,31 @@ stages:
             -----END CERTIFICATE-----
       commands:
         - update-ca-certificates
+    - name: "Configure a static IP for eth0"
+      files:
+        # Matches the DHCP reservation already bound to this Pi's MAC on the
+        # Deco mesh. This is a second, independent guarantee of the same
+        # address, not a change to it -- if the two ever disagree, that is
+        # worth noticing, not something this file should paper over.
+        - path: /etc/netplan/99-thuroros-static.yaml
+          permissions: 0600
+          owner: 0
+          group: 0
+          content: |
+            network:
+              version: 2
+              renderer: networkd
+              ethernets:
+                eth0:
+                  dhcp4: false
+                  addresses:
+                    - 192.168.68.51/22
+                  routes:
+                    - to: default
+                      via: 192.168.68.1
+                  nameservers:
+                    addresses:
+                      - 192.168.68.59
+                      - 1.1.1.1
+      commands:
+        - netplan apply

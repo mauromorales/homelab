@@ -45,17 +45,23 @@ flowchart LR
     push -->|Local Push, WebSocket| phone
 ```
 
-All three hosts advertise on the LAN over mDNS (avahi / Bonjour), so `thuroros`
-reaches mowa at `polaris.local` and Home Assistant at `homeassistant.local`:
-no static IPs.
+`thuroros` reaches mowa at `polaris.local` and Home Assistant at
+`homeassistant.local` over mDNS (avahi / Bonjour): no static IPs for those two
+calls, which `thuroros` makes itself.
 
-mDNS is the right tool for those two calls, which `thuroros` makes itself. It is
-a weaker choice for reaching the config page from a browser, because mDNS needs
-multicast to work between the browser's host and this node, and a mesh network
-does not always carry multicast between every pair of devices. For that reason
-the config page is served by nginx on port 80, and is best reached through a
-normal DNS name pointed at this node. Unicast DNS crosses a mesh where multicast
-may not.
+mDNS is a weaker choice for reaching the config page from a browser, because it
+needs multicast to work between the browser's host and this node, and a mesh
+network does not always carry multicast between every pair of devices. For
+that reason the config page is served by nginx over HTTPS, on
+`doorbell.home.arpa`: a normal unicast DNS rewrite (kept outside this
+repository, in AdGuard Home) crosses a mesh where multicast may not. Port 80
+still answers and redirects straight to 443.
+
+`thuroros`'s own address (`eth0`) is set twice, deliberately: once as a DHCP
+reservation bound to its MAC on the Deco mesh, and once as a static netplan
+config baked into this image. They must agree (`192.168.68.51`); if they ever
+don't, that is worth investigating, not silently resolving in either
+direction.
 
 ## The two nodes
 

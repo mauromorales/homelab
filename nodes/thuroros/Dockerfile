@@ -23,4 +23,8 @@ RUN apt-get update && apt-get install -y \
 RUN apt-get update && apt-get install -y \
     # reverse proxy, so the config UI answers on port 80 at /
     nginx \
+    # generates the self-signed cert nginx serves over HTTPS, and applies
+    # the static netplan config written by cloud-config.yaml
+    openssl \
+    netplan.io \
     && rm -rf /var/lib/apt/lists/*
