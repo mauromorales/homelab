@@ -95,6 +95,9 @@ Existing runbooks:
 - [`docs/ha-os-rpi4-boot.md`](docs/ha-os-rpi4-boot.md) — diagnosing a Home
   Assistant OS boot on the Raspberry Pi 4, and the display-handover failure
   that makes a healthy board look dead.
+- [`docs/tailscale-remote-access.md`](docs/tailscale-remote-access.md) —
+  reaching `home.arpa` names and the home LAN over Tailscale from off the
+  home network: split DNS plus a subnet router, exit node kept optional.
 
 ## Build pipeline (all builds happen in GitHub Actions)
 
