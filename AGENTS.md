@@ -95,6 +95,9 @@ Existing runbooks:
 - [`docs/ha-os-rpi4-boot.md`](docs/ha-os-rpi4-boot.md) — diagnosing a Home
   Assistant OS boot on the Raspberry Pi 4, and the display-handover failure
   that makes a healthy board look dead.
+- [`docs/hegemon-k8s-day2.md`](docs/hegemon-k8s-day2.md) — the storage
+  provisioner and ingress controller installed on `hegemon`'s cluster, how to
+  reproduce them, and how a deployed service gets reached.
 
 ## Build pipeline (all builds happen in GitHub Actions)
 

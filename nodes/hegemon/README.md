@@ -75,12 +75,19 @@ same way `thuroros` does (`nodes/thuroros/cloud-config.yaml`): a
 `kairos-agent`'s registration back to the fleet server after install fails
 TLS verification.
 
+## Kubernetes day-2 add-ons
+
+Default `StorageClass` (`local-path`) and an ingress controller
+(`ingress-nginx`, internal-only via a `*.apps.home.arpa` DNS wildcard) are
+installed. See [`docs/hegemon-k8s-day2.md`](../../docs/hegemon-k8s-day2.md)
+for what's running, how to reproduce it, and how a deployed service gets
+reached.
+
 ## Still open
 
-- **Storage** for the cluster is not yet decided.
+- **Secrets** for whatever runs on the cluster — no secrets manager installed.
 - **Day-2 tooling** — AuroraBoot fleet vs. `kairos-operator`, once this node
   is a cluster member with something to reconcile.
-- **Ingress and secrets** for whatever runs on the cluster.
 - **`hegemon.local` doesn't resolve.** Every other node here uses mDNS
   (`avahi-daemon` + `libnss-mdns`, per the top-level `CLAUDE.md`/`AGENTS.md`
   discovery convention), but this node runs an upstream Hadron image with no
