@@ -1,39 +1,15 @@
 # Hegemonikon
 
-My personal homelab.
+Builds the OS images for my personal homelab.
 
 ![hegemonikon-logo](./assets/hegemonikon-logo.png)
 
-## Why Hegemonikon?
+This repo holds the `Dockerfile`s, Kairos `cloud-config.yaml` files, and the
+GitHub Actions pipeline that turn them into bootable Kairos images. Hardware
+inventory, network layout, and the rest of the lab's architecture live in a
+private repo, not here.
 
-The name comes from the Stoic concept of the *hegemonikon*—the "commanding faculty" that directs thought and action.  
-This lab is my personal sandbox for exploring OS design, Kubernetes architectures, and automation with a philosophy-driven approach:
-
-- **Purpose over generality:** Every component is built for a specific role.
-- **Simplicity over complexity:** No unnecessary moving parts.
-- **Learning by doing:** This is as much about the process as the result.
-
-## Hardware
-
-| Device | Name | Role in Lab | Status | CPU | GPU | Memory | Storage |
-| ------ | ---- | ----------- | ------ | --- | --- | ------ | ------- |
-| Beelink SER5 | `midnight` | Always-on agent host | Running | Ryzen 7 5825U, 8C/16T | Radeon (integrated) | 64 GB DDR4-3200 | 1 TB NVMe SSD |
-| HP ProDesk 600 G4 Mini | `hegemon` | Control Plane | Planned | Core i5-8500T (8th Gen) 2.1 GHz | Intel UHD Graphics 630 | 16 GB | 256 GB SSD |
-| HP Z4 G4 | `helios` | Worker (GPU) | Planned | Xeon W-2235, 6C/12T | Quadro RTX 4000 8GB | 64 GB DDR4 ECC | 512 GB SSD |
-| Mac Mini | `polaris` | iCloud Supporting Services | Running | M2 | M2 | 8G | 256 GB SSD |
-| Raspberry Pi 4 | [`thuroros`](./nodes/thuroros/README.md) | Doorbell relay | Running | ARM Cortex-A72 | Whatever comes in the Pi | 8G | SD Card |
-| Raspberry Pi 4 | `homeassistant` | Home Assistant host | Running | ARM Cortex-A72 | Whatever comes in the Pi | 8G | USB SSD |
-| Raspberry Pi 5 | TBC | Not yet assigned | Spare | ARM Cortex-A76 | Whatever comes in the Pi | TBC | TBC |
-
-Four machines are up today: `midnight`, `polaris`, `thuroros` and `homeassistant`. Only `thuroros` runs an OS built from this repository—`midnight` runs Fedora as scaffolding while its Kairos image is built, `polaris` runs macOS, and `homeassistant` runs Home Assistant OS. `hegemon` (planned) is a third case: it boots an upstream Kairos image unmodified, with only a `cloud-config.yaml` from this repo. Hardware detail and architecture notes for `midnight`, `hegemon`, and `polaris` live in the private `hegemonikon` repo, not here.
-
-## Platform Infrastructure
-
-Still in its early stages—so far I’ve locked in the **host OS**, **Kubernetes distro**, and **one supporting service**. Expect this to evolve as I learn and expand the lab.
-
-You can read more about my choices in [Why I Chose This Stack for My K8s Cluster](https://www.mauromorales.com/2025/08/11/why-i-chose-this-stack-for-my-k8s-cluster/).
-
-### Host OS
+## Host OS
 
 **Philosophy:** I'm building a **Special-Purpose OS (SPOS)** for each node. No generic images that need post-install tweaking. Each OS:
 
@@ -68,30 +44,4 @@ Kairos Factory produces two artifacts per build:
 
 Only **ThurorOS** is currently built by the [release pipeline](./.github/workflows/release.yaml); the other nodes are on hold until they have been tested. **Kairos riscv64** isn't part of that pipeline at all — Kairos Factory doesn't support riscv64 yet, so it has its own [build workflow](./.github/workflows/build-kairos-riscv64.yaml) that publishes to [GitHub Releases](../../releases) instead of `quay.io`. See [its README](./nodes/kairos-riscv64/README.md).
 
-This table is about the images I build here, not about every machine that is up. The other running machines—`midnight`, `polaris` and `homeassistant`—boot an OS that comes from somewhere else, and the hardware table above is the place to look for them.
-
 More on this topic: [What Are Special-Purpose Operating Systems in the Cloud-Native World?](https://www.mauromorales.com/2025/04/16/what-are-special-purpose-operating-systems-in-the-cloud-native-world/)
-
-### Kubernetes Distribution & Container Runtime
-
-I run **[K0s](https://k0sproject.io)** for its simplicity and architectural choices.
-
-**Why K0s?**
-
-I like the clean separation of control-plane components and the way their tokenization system works. The makers of K0s also created [K0smotron](https://github.com/k0smotron/k0smotron), their implementation of Hosted Control Planes, which I’d like to experiment with in the future.
-
-For now, I stick to the defaults that come with K0s to keep the learning curve smooth: `hegemon` runs the control plane, and `helios` joins as its worker.
-
-### Supporting Services
-
-At the moment, only one:
-
-- **[mowa](https://github.com/mauromorales/mowa)** — sends notifications through Apple Messages and provides simple shared storage outside the cluster.  
-  Runs on `polaris`, the Mac Mini M2 (8 GB RAM). `thuroros` reaches it at `polaris.local`.
-
-## Related Writings
-
-- [The Birth of My Homelab](https://www.mauromorales.com/2025/08/04/the-birth-of-my-homelab/)
-- [Why I Chose This Stack for My K8s Cluster](https://www.mauromorales.com/2025/08/11/why-i-chose-this-stack-for-my-k8s-cluster/)
-- [What Are Special-Purpose Operating Systems in the Cloud-Native World?](https://www.mauromorales.com/2025/04/16/what-are-special-purpose-operating-systems-in-the-cloud-native-world/)
-- [A New Dawn for Secure Linux in Untrusted Environments](https://www.mauromorales.com/2024/06/27/a-new-dawn-for-secure-linux-in-untrusted-environments/)
