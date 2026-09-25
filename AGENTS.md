@@ -31,7 +31,10 @@ Each node lives in `nodes/<name>/` and follows the same shape:
   `hostname`, users (SSH keys pulled from GitHub via `github:mauromorales`),
   optional `k0s` config, and `stages.initramfs` steps that write scripts,
   systemd units, and k8s manifests, then enable them.
-- `README.md` — role and architecture (thuroros's is the detailed example).
+- `README.md` — role and architecture, for nodes that build an image here
+  (thuroros's is the detailed example). Nodes that don't (`midnight`,
+  `hegemon`, `polaris`) have no README in this repo — their role/hardware
+  docs live in the private `hegemonikon` repo instead.
 
 | Node | Role | Arch / model | Released? |
 |---|---|---|---|
@@ -63,13 +66,14 @@ validates that the `--model generic` OS layer builds — nothing more.
 Turning that into a bootable SD image needs the Pi 5 boot chain (u-boot,
 firmware) worked out by hand first; see `nodes/kairos-rpi5/README.md`.
 
-`midnight` is the exception to the pattern: it is **documentation-only** so far
-(`README.md`, no `Dockerfile`/`cloud-config.yaml`). It currently runs interim
-Fedora as scaffolding and targets a Kairos Ubuntu 24.04 image later; its README
-documents hardware, BIOS/boot-order, Wake-on-LAN, and PXE/fTPM specifics for
-that migration. When building its image, follow the standard two-file node shape
-above. The decision to base it on Kairos Ubuntu 24.04 is recorded in homelab
-ADR-001, which now lives in the private steering repository (see below).
+`midnight` is the exception to the pattern: it has no `Dockerfile`/
+`cloud-config.yaml`/`README.md` here at all yet. It currently runs interim
+Fedora as scaffolding and targets a Kairos Ubuntu 24.04 image later; hardware,
+BIOS/boot-order, Wake-on-LAN, and PXE/fTPM specifics for that migration are
+documented in the private `hegemonikon` repo, not here. When building its
+image, follow the standard two-file node shape above. The decision to base it
+on Kairos Ubuntu 24.04 is recorded in homelab ADR-001, which now lives in the
+private steering repository (see below).
 
 ## Architecture decisions are NOT in this repository
 
