@@ -11,38 +11,36 @@ symlink there.
 
 ## What this repo is
 
-"Hegemonikon" — a personal homelab defined as code. There is no application to
-run locally: the repository *is* the declarative source for a set of immutable,
-**special-purpose OS images** (one per node), each built with
-[Kairos](https://kairos.io) from an Ubuntu base plus a first-boot
-`cloud-config.yaml`. Images are produced in CI and published to
-`quay.io/mauromorales/<node>`; hosts are updated by rebuilding and re-flashing
-images, never by editing a running system. To change how a node behaves, edit
-its `Dockerfile`/`cloud-config.yaml` and let the pipeline rebuild — do not
-reach for live-host configuration.
+`kairos-images` — community-built Kairos images, defined as code. There is
+no application to run locally: the repository *is* the declarative source for a
+set of immutable OS images, each built with [Kairos](https://kairos.io) from an
+Ubuntu base plus a first-boot `cloud-config.yaml`. Images are produced in CI
+and published to `quay.io/mauromorales/<image>`. To change how an image
+behaves, edit its `Dockerfile`/`cloud-config.yaml` and let the pipeline
+rebuild.
 
-## Node layout
+## Image layout
 
-Each node lives in `nodes/<name>/` and follows the same shape:
+Each image lives in `nodes/<name>/` and follows the same shape:
 
 - `Dockerfile` — the **base image**: an Ubuntu image with a few extra apt
   packages layered on. This is *not* the final OS; it is the input to Kairos.
-- `cloud-config.yaml` — Kairos first-boot config: the heart of the node. Sets
-  `hostname`, users (SSH keys pulled from GitHub via `github:mauromorales`),
-  and `stages.initramfs` steps that write scripts and systemd units, then
-  enable them.
-- `README.md` — role and architecture (thuroros's is the detailed example).
+- `cloud-config.yaml` — Kairos first-boot config: the heart of the image. Sets
+  `hostname`, users and their SSH keys, and `stages.initramfs` steps that write
+  scripts and systemd units, then enable them.
+- `README.md` — what the image is for and how it works (thuroros's is the
+  detailed example).
 
-| Node | Role | Arch / model | Released? |
+| Image | Role | Arch / model | Released? |
 |---|---|---|---|
-| `thuroros` | Doorbell relay (Raspberry Pi) | arm64 / `rpi4` | **yes — the only released image** |
-| `kairos-riscv64` | Community riscv64 hardware test image, not a real node | riscv64 / `generic` | experimental — see below |
-| `kairos-rpi5` | Raspberry Pi 5 hardware bring-up, not a real node | arm64 / `generic` | experimental — CI validates the OS layer only, no boot artifact yet, see below |
+| `thuroros` (to be renamed Kairos Ubuntu 22.04 rpi4) | Doorbell relay (Raspberry Pi) | arm64 / `rpi4` | **yes — the only released image** |
+| `kairos-riscv64` | Community riscv64 hardware test image | riscv64 / `generic` | experimental — see below |
+| `kairos-rpi5` | Raspberry Pi 5 hardware bring-up | arm64 / `generic` | experimental — CI validates the OS layer only, no boot artifact yet, see below |
 
 `kairos-riscv64` doesn't fit the release pattern: `kairos-io/kairos-factory-action`
 hard-rejects any arch other than amd64/arm64, so it can't go through
 `release.yaml`'s factory-based pipeline at all. It has its own
-`build-kairos-riscv64.yaml`, which validates on push/PR like every other node
+`build-kairos-riscv64.yaml`, which validates on push/PR like every other image
 but only publishes a GitHub Release (not a `quay.io` image) when manually
 triggered with a version input — see `nodes/kairos-riscv64/README.md`.
 
@@ -57,12 +55,12 @@ firmware) worked out by hand first; see `nodes/kairos-rpi5/README.md`.
 
 `thuroros` is a **two-stage build**:
 
-1. **Base image** — a plain `docker build` of `nodes/<node>/Dockerfile`, pushed
-   as `quay.io/mauromorales/<node>:base-<sha>`. This step you *can* reproduce
-   locally: `docker build -f nodes/<node>/Dockerfile nodes/<node>`.
+1. **Base image** — a plain `docker build` of `nodes/<name>/Dockerfile`, pushed
+   as `quay.io/mauromorales/<name>:base-<sha>`. This step you *can* reproduce
+   locally: `docker build -f nodes/<name>/Dockerfile nodes/<name>`.
 2. **Kairos Factory** — the reusable workflow
    `kairos-io/kairos-factory-action/.github/workflows/reusable-factory.yaml`
-   consumes that base image plus the node's `cloud-config.yaml` and emits the
+   consumes that base image plus the image's `cloud-config.yaml` and emits the
    Kairos artifacts (container image for upgrades, and ISO/RAW bootable media).
    This stage is CI-only; there is no simple local equivalent.
 
@@ -71,8 +69,8 @@ to the factory — a custom layer that runs `kairos-init` explicitly.
 
 ### Workflows
 
-- `.github/workflows/build-<node>.yaml` — **per-node CI** for testing. Triggers
-  on `push`/`pull_request` that touch that node's files. Builds the base image
+- `.github/workflows/build-<name>.yaml` — **per-image CI** for testing. Triggers
+  on `push`/`pull_request` that touch that image's files. Builds the base image
   and runs the factory with `quay.expires-after=2d` so test artifacts are
   ephemeral. Use these to validate a change to a Dockerfile or cloud-config.
   `build-kairos-riscv64.yaml` and `build-kairos-rpi5.yaml` are the two special
@@ -84,10 +82,10 @@ to the factory — a custom layer that runs `kairos-init` explicitly.
 To cut a release: push a `thuroros-v<semver>` git tag, e.g.
 `thuroros-v1.1.2`. `release.yaml` does create a GitHub Release (verified
 2026-08-25 against `thuroros-v1.1.2`), but with no file assets attached --
-the image itself is the artifact, published to `quay.io`. To test a node
-change: open a PR touching `nodes/<node>/` and let `build-<node>.yaml` run.
+the image itself is the artifact, published to `quay.io`. To test an image
+change: open a PR touching `nodes/<name>/` and let `build-<name>.yaml` run.
 
-## Cross-node conventions worth knowing
+## Conventions worth knowing
 
 - **systemd units are created from `cloud-config.yaml`, not shipped as files.**
   The pattern: write the unit under `stages.initramfs` via `files:`, then a
