@@ -1,6 +1,6 @@
 # kairos-images
 
-Builds [Kairos](https://kairos.io) OS images for my personal homelab.
+Community-built [Kairos](https://kairos.io) images.
 
 This repo holds the `Dockerfile`s, Kairos `cloud-config.yaml` files, and the
 GitHub Actions pipeline that turn them into bootable Kairos images.

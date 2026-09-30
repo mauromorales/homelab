@@ -11,7 +11,7 @@ symlink there.
 
 ## What this repo is
 
-`kairos-images` — OS images for a personal homelab, defined as code. There is
+`kairos-images` — community-built Kairos images, defined as code. There is
 no application to run locally: the repository *is* the declarative source for a set of immutable,
 **special-purpose OS images** (one per node), each built with
 [Kairos](https://kairos.io) from an Ubuntu base plus a first-boot
