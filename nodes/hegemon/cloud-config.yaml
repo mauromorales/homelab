@@ -56,3 +56,36 @@ stages:
             -----END CERTIFICATE-----
       commands:
         - update-ca-certificates
+
+    - name: "Trust the apps.home.arpa CA"
+      files:
+        # Public CA certificate only. containerd reads the system trust store,
+        # so without this the node cannot pull images from
+        # forgejo.apps.home.arpa (x509: certificate signed by unknown
+        # authority). The CA key is not here.
+        - path: /usr/local/share/ca-certificates/apps-home-arpa-ca.crt
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            -----BEGIN CERTIFICATE-----
+            MIIDGTCCAgGgAwIBAgIUDeCImbAiYDhfC2YDPJfrKpfn77wwDQYJKoZIhvcNAQEL
+            BQAwHDEaMBgGA1UEAwwRYXBwcy5ob21lLmFycGEtY2EwHhcNMjYwOTIxMTIyMDEw
+            WhcNMzYwOTE4MTIyMDEwWjAcMRowGAYDVQQDDBFhcHBzLmhvbWUuYXJwYS1jYTCC
+            ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMS0wbd5wX7zwWG0Yk0fVXnu
+            IltI9i6iBR7xv8OHkWkThYhWN1MFwqAPUG73IkBtqyMdoQ0J2EDP2912kzbkR4cB
+            Kc52INFdBjk9fsSznzB9Z0Hk3FONPsOGAoGeRoYaUCsQ8eXabK3YmLgM7mNIDPug
+            KSIsLk+lYLHOJUywkH/49AHefxYGPCEDiDnIq8gIQRg8+Q2sWFYsTV8aq2bku9SV
+            0yA0zA2xMQGjgv212sjBl6CNkVClE3sXM8XTLwbwuOWj2IKe/WKq8nkyqHOITWcL
+            gYoNfYXn35JS5/LAjW3ymVqOIhx1EC7zI1cVLwtR1MTRz7fOHemTm1Ru5/BwywEC
+            AwEAAaNTMFEwHQYDVR0OBBYEFEUHXjbi+77C+AYPotRPaWPIspBvMB8GA1UdIwQY
+            MBaAFEUHXjbi+77C+AYPotRPaWPIspBvMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZI
+            hvcNAQELBQADggEBAEKe6EkCfG6baS57P0Ho5QFU5HbygIMRNCDJsBaunwfEakdb
+            VjG/BiH2aixC0IePaGj7e95x7DDP/1eYpG4+tmh0XBddp6bHE0CMvgWoJyP7EUBS
+            CrWjcfnne1TWcGTl9W1EF39DAo0oaXVzm6I2ornnIRzza/zltCVDFOo/WuoqwQnl
+            C9Do0CpmE5s5UycCUZ4GGXs6v6UcUDzNV6kgaC1RqFg8DTqNlocJLGSS2w5PRIih
+            lzxp1zEwm/0B2W0cuRDGZ4V8ILjwyENSjsABNCP12c8zCnJXwNvtXfaTE1PTU41A
+            5ZXjr9geQfdKe4JNXdKiECV6N5HhfhdSELCyMKc=
+            -----END CERTIFICATE-----
+      commands:
+        - update-ca-certificates
