@@ -11,8 +11,8 @@ symlink there.
 
 ## What this repo is
 
-"Hegemonikon" — a personal homelab defined as code. There is no application to
-run locally: the repository *is* the declarative source for a set of immutable,
+`kairos-images` — OS images for a personal homelab, defined as code. There is
+no application to run locally: the repository *is* the declarative source for a set of immutable,
 **special-purpose OS images** (one per node), each built with
 [Kairos](https://kairos.io) from an Ubuntu base plus a first-boot
 `cloud-config.yaml`. Images are produced in CI and published to
@@ -35,7 +35,7 @@ Each node lives in `nodes/<name>/` and follows the same shape:
 
 | Node | Role | Arch / model | Released? |
 |---|---|---|---|
-| `thuroros` | Doorbell relay (Raspberry Pi) | arm64 / `rpi4` | **yes — the only released image** |
+| `thuroros` (to be renamed Kairos Ubuntu 22.04 rpi4) | Doorbell relay (Raspberry Pi) | arm64 / `rpi4` | **yes — the only released image** |
 | `kairos-riscv64` | Community riscv64 hardware test image, not a real node | riscv64 / `generic` | experimental — see below |
 | `kairos-rpi5` | Raspberry Pi 5 hardware bring-up, not a real node | arm64 / `generic` | experimental — CI validates the OS layer only, no boot artifact yet, see below |
 
