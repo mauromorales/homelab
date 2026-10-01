@@ -19,6 +19,13 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
+    # This image is named Kairos Ubuntu 22.04 rpi4: stay on Ubuntu 22.04.
+    # Only patch updates of the same release come through.
+    ignore:
+      - dependency-name: "ubuntu"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     open-pull-requests-limit: 3
     commit-message:
       prefix: "chore"
