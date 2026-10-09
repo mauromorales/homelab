@@ -415,9 +415,11 @@ stages:
         - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
     - name: "Trust fleet.home.arpa's certificate"
       files:
-        # Public cert only, self-signed today. Re-issuing this from an
-        # internal CA later is a content swap in this same file -- no change
-        # to how it's trusted.
+        # Public cert only, self-signed today. The fleet server's certificate
+        # is going to be re-issued from the apps.home.arpa CA. This stanza
+        # stays until every node trusts that CA (see the stanza after this
+        # one). A node trusts the re-issued certificate through the CA, so the
+        # re-issue needs no change to this file.
         #
         # Regenerated 2026-08-28 with a proper SAN: the original had none,
         # which Go's crypto/tls -- kairos-agent's TLS
