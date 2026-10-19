@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Check a built Kairos Hadron NVIDIA image without booting it.
+# Usage: test-image.sh <image> [module-version [userspace-version]]
+# The userspace version defaults to the module version. A deliberate mismatch build passes both.
+# Needs docker, zstd, modinfo, lsinitrd and strings on the host.
+set -euo pipefail
+
+image="${1:?usage: test-image.sh <image> [module-version [userspace-version]]}"
+want="${2:-595.91.07}"
+want_user="${3:-$want}"
+
+work="$(mktemp -d "${TMPDIR:-/var/tmp}/test-image.XXXXXX")"
+cid=""
+cleanup() {
+  [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1 || true
+  rm -rf "$work"
+}
+trap cleanup EXIT
+
+fail=0
+pass() { echo "PASS  $1"; }
+miss() { echo "FAIL  $1"; fail=1; }
+
+cid="$(docker create "$image" /bin/true)"
+docker export "$cid" | tar -x -C "$work" \
+  --wildcards 'etc/cos/bootargs.cfg' 'boot/initrd*' 'usr/lib/modules/*' \
+  'usr/libc/lib/libnvidia-ml.so.*' 'usr/share/licenses/nvidia-driver/*' 2>/dev/null || true
+
+# 1. The serial console is ttyS4, and ttyS0 is not the default.
+cfg="$work/etc/cos/bootargs.cfg"
+if [ -f "$cfg" ] && grep -q 'baseExtraConsole="console=ttyS4,115200"' "$cfg"; then
+  pass "bootargs.cfg sets console=ttyS4,115200"
+else
+  miss "bootargs.cfg does not set console=ttyS4,115200"
+fi
+if [ -f "$cfg" ] && grep -q 'baseExtraConsole="console=ttyS0"' "$cfg"; then
+  miss "bootargs.cfg still has the console=ttyS0 default"
+else
+  pass "bootargs.cfg has no console=ttyS0 default"
+fi
+
+# 2. The kernel module version is the expected one.
+ko="$(find "$work/usr/lib/modules" -name 'nvidia.ko*' -print -quit 2>/dev/null || true)"
+if [ -z "$ko" ]; then
+  miss "no nvidia.ko in /usr/lib/modules"
+else
+  case "$ko" in
+    *.zst) zstd -dcq "$ko" > "$work/nvidia.ko" ;;
+    *)     cp "$ko" "$work/nvidia.ko" ;;
+  esac
+  got="$(modinfo -F version "$work/nvidia.ko" 2>/dev/null || true)"
+  if [ "$got" = "$want" ]; then
+    pass "nvidia.ko version is $got"
+  else
+    miss "nvidia.ko version is '${got:-unknown}', want $want"
+  fi
+fi
+
+# 3. The userspace library version is the expected one.
+lib="$(find "$work/usr/libc/lib" -name 'libnvidia-ml.so.*.*' -print -quit 2>/dev/null || true)"
+if [ -z "$lib" ]; then
+  miss "no libnvidia-ml.so.<version> in /usr/libc/lib"
+elif [ "${lib##*.so.}" = "$want_user" ]; then
+  pass "userspace library version is ${lib##*.so.}"
+else
+  miss "userspace library version is ${lib##*.so.}, want $want_user"
+fi
+
+# 4. NVIDIA's licence is in the image.
+if [ -s "$work/usr/share/licenses/nvidia-driver/LICENSE.txt" ]; then
+  pass "NVIDIA licence is in the image"
+else
+  miss "NVIDIA licence is missing"
+fi
+
+# 5. The initrd can fetch a live root over HTTP (needed for netboot).
+initrd="$(find "$work/boot" -maxdepth 1 -name 'initrd*' -print -quit 2>/dev/null || true)"
+if [ -z "$initrd" ]; then
+  miss "no initrd in /boot"
+elif lsinitrd -f usr/lib/dracut/modules.txt "$initrd" 2>/dev/null | grep -qx livenet; then
+  pass "initrd has the livenet dracut module"
+else
+  miss "initrd has no livenet dracut module"
+fi
+
+exit "$fail"
