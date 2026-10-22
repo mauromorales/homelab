@@ -24,7 +24,8 @@ miss() { echo "FAIL  $1"; fail=1; }
 cid="$(docker create "$image" /bin/true)"
 docker export "$cid" | tar -x -C "$work" \
   --wildcards 'etc/cos/bootargs.cfg' 'boot/initrd*' 'usr/lib/modules/*' \
-  'usr/libc/lib/libnvidia-ml.so.*' 'usr/share/licenses/nvidia-driver/*' 2>/dev/null || true
+  'usr/libc/lib/libnvidia-ml.so.*' 'usr/libc/lib/libcuda.so.*' 'usr/bin/nvidia-smi' \
+  'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' 2>/dev/null || true
 
 # 1. The serial console is ttyS4, and ttyS0 is not the default.
 cfg="$work/etc/cos/bootargs.cfg"
