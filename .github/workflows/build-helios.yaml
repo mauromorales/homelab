@@ -8,12 +8,12 @@ on:
     branches:
       - 'main'
     paths:
-      - 'nodes/kairos-hadron-nvidia/**'
-      - '.github/workflows/build-kairos-hadron-nvidia.yaml'
+      - 'nodes/helios/**'
+      - '.github/workflows/build-helios.yaml'
   pull_request:
     paths:
-      - 'nodes/kairos-hadron-nvidia/**'
-      - '.github/workflows/build-kairos-hadron-nvidia.yaml'
+      - 'nodes/helios/**'
+      - '.github/workflows/build-helios.yaml'
   workflow_dispatch:
     inputs:
       tag:
@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 env:
-  IMAGE: quay.io/mauromorales/kairos-hadron-nvidia
+  IMAGE: quay.io/mauromorales/helios
   NVIDIA_VERSION: '595.91.07'
 
 jobs:
@@ -79,14 +79,14 @@ jobs:
       - name: Build
         uses: docker/build-push-action@v6
         with:
-          context: nodes/kairos-hadron-nvidia
+          context: nodes/helios
           build-args: |
             JOBS=2
             NVIDIA_VERSION=${{ env.NVIDIA_VERSION }}
             NVIDIA_USERSPACE_VERSION=${{ steps.user.outputs.value }}
           labels: |
             ${{ steps.tag.outputs.expires != '' && format('quay.expires-after={0}', steps.tag.outputs.expires) || '' }}
-          tags: kairos-hadron-nvidia:ci
+          tags: helios:ci
           load: true
 
       - name: Install the check tools
@@ -98,7 +98,7 @@ jobs:
         env:
           USER_VERSION: ${{ steps.user.outputs.value }}
         run: |
-          nodes/kairos-hadron-nvidia/test-image.sh kairos-hadron-nvidia:ci \
+          nodes/helios/test-image.sh helios:ci \
             "${NVIDIA_VERSION}" "${USER_VERSION}"
 
       # Pull requests from forks have no secrets, so they stop after the check.
@@ -115,6 +115,6 @@ jobs:
         env:
           TAG: ${{ steps.tag.outputs.value }}
         run: |
-          docker tag kairos-hadron-nvidia:ci "${IMAGE}:${TAG}"
+          docker tag helios:ci "${IMAGE}:${TAG}"
           docker push "${IMAGE}:${TAG}"
           echo "Pushed ${IMAGE}:${TAG}" >> "$GITHUB_STEP_SUMMARY"

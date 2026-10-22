@@ -36,7 +36,7 @@ Each image lives in `nodes/<name>/` and follows the same shape:
 | `thuroros` (to be renamed Kairos Ubuntu 22.04 rpi4) | Doorbell relay (Raspberry Pi) | arm64 / `rpi4` | **yes — the only released image** |
 | `kairos-riscv64` | Community riscv64 hardware test image | riscv64 / `generic` | experimental — see below |
 | `kairos-rpi5` | Raspberry Pi 5 hardware bring-up | arm64 / `generic` | experimental — CI validates the OS layer only, no boot artifact yet, see below |
-| `kairos-hadron-nvidia` | amd64 GPU worker (k0s) | amd64 / `generic` | experimental — own `build-kairos-hadron-nvidia.yaml`, pushes to `quay.io`, see its README |
+| `helios` | amd64 GPU worker (k0s) | amd64 / `generic` | experimental — own `build-helios.yaml`, pushes to `quay.io`, see its README |
 
 `kairos-riscv64` doesn't fit the release pattern: `kairos-io/kairos-factory-action`
 hard-rejects any arch other than amd64/arm64, so it can't go through

@@ -8,7 +8,7 @@ Hadron, so the node can join a k0s cluster as a worker.
 |---|---|
 | Base | `quay.io/kairos/hadron:v0.5.1-standard-amd64-generic-v4.3.0-k0s-v1.36.4-k0s.0` |
 | Driver | NVIDIA 595.91.07, open kernel modules built against the Hadron kernel |
-| Image | `quay.io/mauromorales/kairos-hadron-nvidia` |
+| Image | `quay.io/mauromorales/helios` |
 | Tag | `v0.5.1-nvidia-595.91.07-k0s-v1.36.4-r<N>` |
 
 The `Dockerfile` is adapted from the
@@ -29,7 +29,7 @@ example in kairos-io/hadron (commit `ce78a7c`). Changes from that example:
 ## Check an image
 
 ```sh
-nodes/kairos-hadron-nvidia/test-image.sh <image> [module-version [userspace-version]]
+nodes/helios/test-image.sh <image> [module-version [userspace-version]]
 ```
 
 The script exports the image and checks, without booting it: the `ttyS4` console line, the
@@ -48,8 +48,8 @@ the tag. For a mismatch build, also enter `nvidia_userspace_version`.
 To build on your machine:
 
 ```sh
-docker build --build-arg JOBS=$(nproc) -t kairos-hadron-nvidia:local nodes/kairos-hadron-nvidia
-nodes/kairos-hadron-nvidia/test-image.sh kairos-hadron-nvidia:local
+docker build --build-arg JOBS=$(nproc) -t helios:local nodes/helios
+nodes/helios/test-image.sh helios:local
 ```
 
 The kernel module build takes a while. It downloads the Linux source for the exact kernel
