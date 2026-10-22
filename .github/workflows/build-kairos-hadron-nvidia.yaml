@@ -81,7 +81,7 @@ jobs:
         with:
           context: nodes/kairos-hadron-nvidia
           build-args: |
-            JOBS=4
+            JOBS=2
             NVIDIA_VERSION=${{ env.NVIDIA_VERSION }}
             NVIDIA_USERSPACE_VERSION=${{ steps.user.outputs.value }}
           labels: |
