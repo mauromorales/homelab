@@ -87,9 +87,11 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     else echo "Unsupported architecture: $TARGETARCH" && exit 1; \
     fi
 
-# Pinned checksum of the amd64 archive, from NVIDIA's redistrib manifest. A new version needs a new value.
+# Pinned checksum of the amd64 archive for one driver version, from NVIDIA's redistrib manifest.
+# A different userspace version has no pinned value and is built unverified, on purpose (the mismatch test).
+ARG NVIDIA_DRIVER_SHA256_VERSION=595.91.07
 ARG NVIDIA_DRIVER_SHA256_AMD64=93e0487897e843be767a3d259dffea8ac32dffff846e83df8d3abbf30be754ae
-RUN if [ "$TARGETARCH" = "amd64" ] && [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_VERSION" ]; then echo "${NVIDIA_DRIVER_SHA256_AMD64}  nvidia.tar.xz" | sha256sum -c -; fi
+RUN if [ "$TARGETARCH" = "amd64" ] && [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_DRIVER_SHA256_VERSION" ]; then echo "${NVIDIA_DRIVER_SHA256_AMD64}  nvidia.tar.xz" | sha256sum -c -; fi
 RUN tar -xf nvidia.tar.xz --strip-components=1 && rm nvidia.tar.xz
 RUN test -s LICENSE
 

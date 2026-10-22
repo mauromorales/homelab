@@ -28,6 +28,9 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: helios-${{ github.event_name }}-${{ inputs.tag || github.ref }}
+
 env:
   IMAGE: quay.io/mauromorales/helios
   NVIDIA_VERSION: '595.91.07'
@@ -49,11 +52,14 @@ jobs:
             if [ "$GITHUB_REF" != "refs/heads/main" ]; then
               echo "A durable tag can only be pushed from main." >&2; exit 1
             fi
-            if ! printf '%s' "$INPUT_TAG" | grep -Eq '^[A-Za-z0-9._-]+$'; then
-              echo "Bad tag: $INPUT_TAG" >&2; exit 1
+            if [[ ! "$INPUT_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
+              echo "Bad tag." >&2; exit 1
             fi
-            if docker manifest inspect "${IMAGE}:${INPUT_TAG}" >/dev/null 2>&1; then
+            # Only a clear "not found" answer lets the push go on. Any other failure stops the run.
+            if out="$(docker manifest inspect "${IMAGE}:${INPUT_TAG}" 2>&1)"; then
               echo "Tag ${INPUT_TAG} already exists. Pick a new one." >&2; exit 1
+            elif ! printf '%s' "$out" | grep -qi -E 'manifest unknown|no such manifest|not found'; then
+              echo "Cannot tell if the tag exists: $out" >&2; exit 1
             fi
             echo "value=$INPUT_TAG" >> "$GITHUB_OUTPUT"
             echo "expires=" >> "$GITHUB_OUTPUT"
@@ -68,8 +74,8 @@ jobs:
           INPUT_USER: ${{ inputs.nvidia_userspace_version }}
         run: |
           v="${INPUT_USER:-$NVIDIA_VERSION}"
-          if ! printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
-            echo "Bad userspace version: $v" >&2; exit 1
+          if [[ ! "$v" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Bad userspace version." >&2; exit 1
           fi
           echo "value=$v" >> "$GITHUB_OUTPUT"
 

@@ -40,6 +40,35 @@ else
   pass "bootargs.cfg has no console=ttyS0 default"
 fi
 
+# 2a. The module sits under the one kernel the image boots, matches its vermagic, and is indexed.
+kdirs=("$work"/usr/lib/modules/*/)
+if [ "${#kdirs[@]}" -ne 1 ] || [ ! -d "${kdirs[0]}" ]; then
+  miss "want exactly one kernel directory in /usr/lib/modules, found ${#kdirs[@]}"
+else
+  kdir="${kdirs[0]%/}"
+  kname="${kdir##*/}"
+  kmod="$(find "$kdir" -name 'nvidia.ko*' -print -quit 2>/dev/null || true)"
+  if [ -z "$kmod" ]; then
+    miss "nvidia.ko is not under /usr/lib/modules/$kname"
+  else
+    pass "nvidia.ko is under /usr/lib/modules/$kname"
+    case "$kmod" in
+      *.zst) zstd -dcq "$kmod" > "$work/vermagic.ko" ;;
+      *)     cp "$kmod" "$work/vermagic.ko" ;;
+    esac
+    vm="$(modinfo -F vermagic "$work/vermagic.ko" 2>/dev/null || true)"
+    case "$vm" in
+      "$kname"*) pass "vermagic matches $kname" ;;
+      *) miss "vermagic '${vm:-unknown}' does not match $kname" ;;
+    esac
+  fi
+  if grep -q 'nvidia\.ko' "$kdir/modules.dep" 2>/dev/null; then
+    pass "modules.dep lists nvidia.ko"
+  else
+    miss "modules.dep does not list nvidia.ko"
+  fi
+fi
+
 # 2. The kernel module version is the expected one.
 ko="$(find "$work/usr/lib/modules" -name 'nvidia.ko*' -print -quit 2>/dev/null || true)"
 if [ -z "$ko" ]; then
