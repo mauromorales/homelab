@@ -43,14 +43,35 @@ jobs:
         id: tag
         env:
           INPUT_TAG: ${{ inputs.tag }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           if [ -n "$INPUT_TAG" ]; then
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "A durable tag can only be pushed from main." >&2; exit 1
+            fi
+            if ! printf '%s' "$INPUT_TAG" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+              echo "Bad tag: $INPUT_TAG" >&2; exit 1
+            fi
+            if docker manifest inspect "${IMAGE}:${INPUT_TAG}" >/dev/null 2>&1; then
+              echo "Tag ${INPUT_TAG} already exists. Pick a new one." >&2; exit 1
+            fi
             echo "value=$INPUT_TAG" >> "$GITHUB_OUTPUT"
             echo "expires=" >> "$GITHUB_OUTPUT"
           else
-            echo "value=test-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+            echo "value=test-${HEAD_SHA::12}" >> "$GITHUB_OUTPUT"
             echo "expires=2d" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Choose the userspace version
+        id: user
+        env:
+          INPUT_USER: ${{ inputs.nvidia_userspace_version }}
+        run: |
+          v="${INPUT_USER:-$NVIDIA_VERSION}"
+          if ! printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo "Bad userspace version: $v" >&2; exit 1
+          fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -62,7 +83,7 @@ jobs:
           build-args: |
             JOBS=4
             NVIDIA_VERSION=${{ env.NVIDIA_VERSION }}
-            NVIDIA_USERSPACE_VERSION=${{ inputs.nvidia_userspace_version || env.NVIDIA_VERSION }}
+            NVIDIA_USERSPACE_VERSION=${{ steps.user.outputs.value }}
           labels: |
             ${{ steps.tag.outputs.expires != '' && format('quay.expires-after={0}', steps.tag.outputs.expires) || '' }}
           tags: kairos-hadron-nvidia:ci
@@ -74,9 +95,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends dracut-core zstd kmod
 
       - name: Check the image
+        env:
+          USER_VERSION: ${{ steps.user.outputs.value }}
         run: |
           nodes/kairos-hadron-nvidia/test-image.sh kairos-hadron-nvidia:ci \
-            "${NVIDIA_VERSION}" "${{ inputs.nvidia_userspace_version || env.NVIDIA_VERSION }}"
+            "${NVIDIA_VERSION}" "${USER_VERSION}"
 
       # Pull requests from forks have no secrets, so they stop after the check.
       - name: Login to Quay

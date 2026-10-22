@@ -2,7 +2,7 @@
 # Check a built Kairos Hadron NVIDIA image without booting it.
 # Usage: test-image.sh <image> [module-version [userspace-version]]
 # The userspace version defaults to the module version. A deliberate mismatch build passes both.
-# Needs docker, zstd, modinfo, lsinitrd and strings on the host.
+# Needs docker, zstd, modinfo and lsinitrd on the host.
 set -euo pipefail
 
 image="${1:?usage: test-image.sh <image> [module-version [userspace-version]]}"
@@ -66,6 +66,11 @@ else
   miss "userspace library version is ${lib##*.so.}, want $want_user"
 fi
 
+# 3b. The other userspace pieces CUDA needs are there, and so is the GSP firmware (Turing needs it).
+for f in "usr/libc/lib/libcuda.so.$want_user" "usr/bin/nvidia-smi" "usr/lib/firmware/nvidia/$want_user/gsp_tu10x.bin"; do
+  if [ -e "$work/$f" ]; then pass "$f is in the image"; else miss "$f is missing"; fi
+done
+
 # 4. NVIDIA's licence is in the image.
 if [ -s "$work/usr/share/licenses/nvidia-driver/LICENSE.txt" ]; then
   pass "NVIDIA licence is in the image"
@@ -79,10 +84,13 @@ if [ -z "$initrd" ]; then
   miss "no initrd in /boot"
 elif ! command -v lsinitrd >/dev/null; then
   miss "lsinitrd is not installed, cannot check the initrd"
-elif lsinitrd -f usr/lib/dracut/modules.txt "$initrd" 2>/dev/null | grep -qx livenet; then
-  pass "initrd has the livenet dracut module"
 else
-  miss "initrd has no livenet dracut module"
+  modules="$(lsinitrd -f usr/lib/dracut/modules.txt "$initrd" 2>/dev/null || true)"
+  if printf '%s\n' "$modules" | grep -qx livenet; then
+    pass "initrd has the livenet dracut module"
+  else
+    miss "initrd has no livenet dracut module"
+  fi
 fi
 
 exit "$fail"

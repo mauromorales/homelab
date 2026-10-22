@@ -12,7 +12,7 @@ ARG HADRON_VERSION=v0.5.1
 # BASE_IMAGE_TAG must be set explicitly — it's the full quay.io tag, not just HADRON_VERSION.
 ARG BASE_IMAGE=quay.io/kairos/hadron
 ARG BASE_IMAGE_TAG=v0.5.1-standard-amd64-generic-v4.3.0-k0s-v1.36.4-k0s.0
-ARG JOBS
+ARG JOBS=4
 # The open kernel modules must guard their linux/of_gpio.h include with
 # NV_LINUX_OF_GPIO_H_PRESENT, because Linux 7.1 removed that header. 580 includes it
 # unconditionally and does not compile against Hadron v0.5.1 (Linux 7.1.3).
@@ -86,6 +86,9 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     else echo "Unsupported architecture: $TARGETARCH" && exit 1; \
     fi
 
+# Pinned checksum of the amd64 archive, from NVIDIA's redistrib manifest. A new version needs a new value.
+ARG NVIDIA_DRIVER_SHA256_AMD64=93e0487897e843be767a3d259dffea8ac32dffff846e83df8d3abbf30be754ae
+RUN if [ "$TARGETARCH" = "amd64" ] && [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_VERSION" ]; then echo "${NVIDIA_DRIVER_SHA256_AMD64}  nvidia.tar.xz" | sha256sum -c -; fi
 RUN tar -xf nvidia.tar.xz --strip-components=1 && rm nvidia.tar.xz
 RUN test -s LICENSE
 
