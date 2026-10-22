@@ -77,6 +77,8 @@ fi
 initrd="$(find "$work/boot" -maxdepth 1 -name 'initrd*' -print -quit 2>/dev/null || true)"
 if [ -z "$initrd" ]; then
   miss "no initrd in /boot"
+elif ! command -v lsinitrd >/dev/null; then
+  miss "lsinitrd is not installed, cannot check the initrd"
 elif lsinitrd -f usr/lib/dracut/modules.txt "$initrd" 2>/dev/null | grep -qx livenet; then
   pass "initrd has the livenet dracut module"
 else

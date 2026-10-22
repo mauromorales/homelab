@@ -68,6 +68,11 @@ jobs:
           tags: kairos-hadron-nvidia:ci
           load: true
 
+      - name: Install the check tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dracut-core zstd kmod
+
       - name: Check the image
         run: |
           nodes/kairos-hadron-nvidia/test-image.sh kairos-hadron-nvidia:ci \
