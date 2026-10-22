@@ -41,8 +41,10 @@ else
 fi
 
 # 2a. The module sits under the one kernel the image boots, matches its vermagic, and is indexed.
+shopt -s nullglob
 kdirs=("$work"/usr/lib/modules/*/)
-if [ "${#kdirs[@]}" -ne 1 ] || [ ! -d "${kdirs[0]}" ]; then
+shopt -u nullglob
+if [ "${#kdirs[@]}" -ne 1 ]; then
   miss "want exactly one kernel directory in /usr/lib/modules, found ${#kdirs[@]}"
 else
   kdir="${kdirs[0]%/}"
@@ -58,7 +60,7 @@ else
     esac
     vm="$(modinfo -F vermagic "$work/vermagic.ko" 2>/dev/null || true)"
     case "$vm" in
-      "$kname"*) pass "vermagic matches $kname" ;;
+      "$kname "*) pass "vermagic matches $kname" ;;
       *) miss "vermagic '${vm:-unknown}' does not match $kname" ;;
     esac
   fi

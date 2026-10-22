@@ -91,7 +91,13 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 # A different userspace version has no pinned value and is built unverified, on purpose (the mismatch test).
 ARG NVIDIA_DRIVER_SHA256_VERSION=595.91.07
 ARG NVIDIA_DRIVER_SHA256_AMD64=93e0487897e843be767a3d259dffea8ac32dffff846e83df8d3abbf30be754ae
-RUN if [ "$TARGETARCH" = "amd64" ] && [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_DRIVER_SHA256_VERSION" ]; then echo "${NVIDIA_DRIVER_SHA256_AMD64}  nvidia.tar.xz" | sha256sum -c -; fi
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      if [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_DRIVER_SHA256_VERSION" ]; then \
+        echo "${NVIDIA_DRIVER_SHA256_AMD64}  nvidia.tar.xz" | sha256sum -c -; \
+      elif [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_VERSION" ]; then \
+        echo "No pinned sha256 for driver ${NVIDIA_VERSION}. Update NVIDIA_DRIVER_SHA256_VERSION and NVIDIA_DRIVER_SHA256_AMD64." >&2; exit 1; \
+      fi; \
+    fi
 RUN tar -xf nvidia.tar.xz --strip-components=1 && rm nvidia.tar.xz
 RUN test -s LICENSE
 

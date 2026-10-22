@@ -58,7 +58,7 @@ jobs:
             # Only a clear "not found" answer lets the push go on. Any other failure stops the run.
             if out="$(docker manifest inspect "${IMAGE}:${INPUT_TAG}" 2>&1)"; then
               echo "Tag ${INPUT_TAG} already exists. Pick a new one." >&2; exit 1
-            elif ! printf '%s' "$out" | grep -qi -E 'manifest unknown|no such manifest|not found'; then
+            elif ! printf '%s' "$out" | grep -qi -E 'manifest unknown|no such manifest'; then
               echo "Cannot tell if the tag exists: $out" >&2; exit 1
             fi
             echo "value=$INPUT_TAG" >> "$GITHUB_OUTPUT"
