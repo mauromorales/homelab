@@ -230,9 +230,9 @@ stages:
                 tmp = CONFIG_PATH + ".tmp"
                 with open(tmp, "w") as f:
                     json.dump(cfg, f, ensure_ascii=False)
-                # May hold a plaintext MQTT password. Root-only, set before
-                # the rename so the file is never briefly world-readable
-                # under its final name.
+                # May hold a plaintext MQTT password. Root-only, set before the
+                # rename so the file is never briefly world-readable under its
+                # final name.
                 os.chmod(tmp, 0o600)
                 os.replace(tmp, CONFIG_PATH)  # atomic
 
@@ -489,9 +489,9 @@ stages:
         - ln -sf /lib/systemd/system/nginx.service /etc/systemd/system/multi-user.target.wants/nginx.service
     - name: "Trust fleet.home.arpa's certificate"
       files:
-        # Public cert only, self-signed today.
-        # Re-issuing this from an internal CA later is a content swap in this
-        # same file -- no change to how it's trusted.
+        # Public cert only, self-signed today. Re-issuing this from an
+        # internal CA later is a content swap in this same file -- no change
+        # to how it's trusted.
         #
         # Regenerated 2026-08-28 with a proper SAN: the original had none,
         # which Go's crypto/tls -- kairos-agent's TLS

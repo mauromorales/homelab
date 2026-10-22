@@ -3,7 +3,9 @@
     "enabled": true,
     "autoAllowBashIfSandboxed": true,
     "network": {
-      "allowedDomains": ["*"]
+      "allowedDomains": [
+        "*"
+      ]
     }
   },
   "permissions": {
@@ -25,10 +27,7 @@
       "Bash(gh issue edit:*)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
-      "Bash(gh pr comment:*)",
-      "Bash(gh project list:*)",
-      "Bash(gh project view:*)",
-      "Bash(gh project item-list:*)"
+      "Bash(gh pr comment:*)"
     ]
   }
 }

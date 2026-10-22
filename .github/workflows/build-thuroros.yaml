@@ -81,7 +81,7 @@ jobs:
       raw: true
       grype: true
       # BuildKit refuses any single attestation over 40 MiB and fails the whole
-      # push; thuroros's SBOM crosses that line (mission-control#123, #339).
+      # push; thuroros's SBOM crosses that line.
       # The image itself is unaffected, this only drops the attached bill of
       # materials. v1.2.0, this workflow's previous pin, hardcoded sbom: true
       # with no way to turn it off, hence the version bump alongside this.
