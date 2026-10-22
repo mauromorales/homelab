@@ -61,6 +61,7 @@ RUN ARCH=${KERNEL_ARCH} KERNEL_UNAME="$(cat /usr/share/kernel-misc/kernel-releas
 # and use the glibc dynamic linker to run the NVIDIA userspace binaries with the correct library path.
 FROM ubuntu:24.04 AS nvidia-builder
 
+ARG NVIDIA_VERSION
 ARG NVIDIA_USERSPACE_VERSION
 ARG OUTPUT=/output
 ENV DEBIAN_FRONTEND=noninteractive
