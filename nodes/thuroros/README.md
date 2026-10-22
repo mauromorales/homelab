@@ -17,7 +17,7 @@ flowchart LR
 
     subgraph thuroros["thuroros · Raspberry Pi 4 (Kairos)"]
         doorbell["doorbell service<br/>(Python + lgpio)"]
-        proxy["nginx :80<br/>reverse proxy"]
+        proxy["nginx :443<br/>HTTPS reverse proxy"]
         webui["doorbell-web<br/>config UI :8080"]
         proxy -->|proxy_pass| webui
         config[("config.json<br/>/usr/local/doorbell")]
@@ -81,7 +81,7 @@ services:
 - **`doorbell-web`** — a tiny stdlib HTTP server on `:8080` serving a config
   page at `/doorbell`. It lets me switch the recipient between the `admin` and
   `family` groups and change the message text without rebuilding the image.
-- **`nginx`** — a reverse proxy on `:80` in front of `doorbell-web`, so the page
+- **`nginx`** — a reverse proxy on `:443` (`:80` redirects to it) in front of `doorbell-web`, so the page
   is reachable at `/` on a plain hostname with no port to remember. `/` redirects
   to `/doorbell`, because `doorbell-web` serves nothing at the root. The site
   matches any hostname (`server_name _`), so pointing a new DNS name at this node

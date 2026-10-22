@@ -184,7 +184,7 @@ stages:
           content: |
             #!/usr/bin/env python3
             """Tiny config UI for the doorbell, served on :8080 at /doorbell and
-            fronted by nginx on port 80, where / redirects to /doorbell.
+            fronted by nginx on 443, where / redirects to /doorbell.
 
             Lets you pick who gets notified (admin/family), change the message text,
             and set the MQTT broker credential, all without redeploying. Writes the
@@ -419,21 +419,28 @@ stages:
         # Server cert for this node's own nginx, not a cert this node trusts
         # (that's the fleet.home.arpa stage below). The key never leaves the
         # Pi and is never committed here -- generated once, on first boot,
-        # into /etc, which Kairos persists as an overlay across reboots and
-        # upgrades. A rebuild or a re-flash makes a new one.
+        # into /usr/local/doorbell/tls, on the COS_PERSISTENT partition, so it
+        # survives reboots and upgrades. (/etc is a tmpfs overlay, and only
+        # /etc/ssl/certs among the ssl paths is persisted, not /etc/ssl/private.)
+        # A rebuild or a re-flash makes a new one.
         #
         # Whoever wants other machines to stop warning about this cert reads
-        # it back off the Pi (/etc/ssl/certs/doorbell.home.arpa.crt) and adds
+        # it back off the Pi (/usr/local/doorbell/tls/doorbell.home.arpa.crt) and adds
         # it to those machines' trust stores by hand, the same one-time step
         # already done for fleet.home.arpa in this file.
         - |
-          if [ ! -f /etc/ssl/certs/doorbell.home.arpa.crt ]; then
-            openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
-              -keyout /etc/ssl/private/doorbell.home.arpa.key \
-              -out /etc/ssl/certs/doorbell.home.arpa.crt \
-              -subj "/CN=doorbell.home.arpa" \
-              -addext "subjectAltName=DNS:doorbell.home.arpa"
-            chmod 600 /etc/ssl/private/doorbell.home.arpa.key
+          TLS=/usr/local/doorbell/tls
+          if [ ! -f $TLS/doorbell.home.arpa.crt ] || [ ! -f $TLS/doorbell.home.arpa.key ]; then
+            (
+              umask 077
+              mkdir -p $TLS
+              openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+                -keyout $TLS/doorbell.home.arpa.key \
+                -out $TLS/doorbell.home.arpa.crt \
+                -subj "/CN=doorbell.home.arpa" \
+                -addext "subjectAltName=DNS:doorbell.home.arpa"
+            )
+            chmod 644 $TLS/doorbell.home.arpa.crt
           fi
     - name: "Add the doorbell reverse proxy"
       files:
@@ -444,9 +451,9 @@ stages:
           content: |
             # doorbell-web listens on :8080 and answers only on /doorbell. This
             # proxy puts it at / on 443 over HTTPS, so the node is reachable by
-            # a plain hostname with no port and no path to remember, and the
-            # MQTT/doorbell config the page writes doesn't cross the LAN in
-            # plaintext.
+            # a plain hostname with no port and no path to remember. HTTPS here
+            # protects that route only: doorbell-web still binds 0.0.0.0:8080,
+            # so the page stays reachable over plain HTTP on that port.
             #
             # server_name is "_" on purpose. The name this node answers to is a
             # DNS record that lives outside this repository, and it has changed
@@ -464,8 +471,8 @@ stages:
                 listen [::]:443 ssl default_server;
                 server_name _;
 
-                ssl_certificate     /etc/ssl/certs/doorbell.home.arpa.crt;
-                ssl_certificate_key /etc/ssl/private/doorbell.home.arpa.key;
+                ssl_certificate     /usr/local/doorbell/tls/doorbell.home.arpa.crt;
+                ssl_certificate_key /usr/local/doorbell/tls/doorbell.home.arpa.key;
 
                 # doorbell-web returns 404 for /, so send the bare hostname to the
                 # page that does exist rather than showing an error.
@@ -552,5 +559,3 @@ stages:
                     addresses:
                       - 192.168.68.59
                       - 1.1.1.1
-      commands:
-        - netplan apply
