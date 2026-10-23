@@ -3,31 +3,32 @@ name: "helios live system"
 # Applies only on a live (netboot) boot, where /run/cos/live_mode exists. Recovery boots
 # use a different marker, and an installed system has neither, so neither is touched.
 #
-# - The default kairos user gets a random password nobody knows. Kairos sets the known
-#   default password in the initramfs stage, so this step also runs there (file order
-#   puts this file after it). Without this, any client that netboots the image gets a
-#   login with a known password.
-# - The install user mauro gets the owner's public SSH keys and no password, so only
-#   a key opens it. It is created in the network stage because a top-level users:
-#   block in a config_url file is not applied at boot on a netboot live system.
-# - A login on the AMT Serial-over-LAN port (ttyS4).
+# Goal: on a live system only a listed SSH key opens a login.
+# - Kairos sets the default password (kairos) for the kairos user in the initramfs stage,
+#   and it opens the same user on tty1/ttyS0 with a root autologin. yip does not order files
+#   by name across the directory, so the steps here run in initramfs.after, which starts
+#   after every initramfs step. The kairos user is locked, and the autologin overrides go.
+# - The install user mauro gets the owner's public SSH keys and a locked password. It is
+#   created in the network stage because a top-level users: block in a config_url file is
+#   not applied at boot on a netboot live system.
+# - A login getty on the AMT Serial-over-LAN port (ttyS4). Every account is locked there,
+#   so the port gives the boot log and no shell.
 stages:
-  initramfs:
-    - name: "Replace the default login password on a live system"
+  initramfs.after:
+    - name: "Lock the default login and remove the root autologin on a live system"
       if: '[ -f /run/cos/live_mode ]'
       users:
         kairos:
-          passwd: "$6$96x/st3LeD14H21Y$F/D7Z1P8zapqI/lu44IeIpbK5ztM.NiIIFfzPFiUePXNp/eZgwxz/pzvoxIc7u5JB7Df5OIz.choLNNzjI42n0"
-    - name: "Console login on the AMT Serial-over-LAN port of a live system"
-      if: '[ -f /run/cos/live_mode ]'
+          passwd: "!"
       commands:
+        - rm -f /etc/systemd/system/getty@tty1.service.d/override.conf /etc/systemd/system/serial-getty@ttyS0.service.d/override.conf
         - ln -sf /usr/lib/systemd/system/serial-getty@.service /etc/systemd/system/getty.target.wants/serial-getty@ttyS4.service
   network:
     - name: "Create the install user on a live system"
       if: '[ -f /run/cos/live_mode ]'
       users:
         kairos:
-          passwd: "$6$96x/st3LeD14H21Y$F/D7Z1P8zapqI/lu44IeIpbK5ztM.NiIIFfzPFiUePXNp/eZgwxz/pzvoxIc7u5JB7Df5OIz.choLNNzjI42n0"
+          passwd: "!"
         mauro:
           passwd: "!"
           groups: ["admin"]

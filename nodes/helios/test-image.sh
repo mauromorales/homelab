@@ -104,12 +104,13 @@ for f in "usr/libc/lib/libcuda.so.$want_user" "usr/bin/nvidia-smi" "usr/lib/firm
   if [ -e "$work/$f" ]; then pass "$f is in the image"; else miss "$f is missing"; fi
 done
 
-# 3c. The live-system config is in the image: key-only install user, replaced default password,
-# and a guard that limits it to a live boot.
+# 3c. The live-system config is in the image: key-only install user, locked default login that
+# runs after Kairos sets its default, and a guard that limits it to a live boot.
 live="$work/system/oem/50_helios_live.yaml"
-if [ -s "$live" ] && grep -q 'ssh-ed25519 ' "$live" && grep -q 'passwd: "\$6\$' "$live" \
-   && grep -q 'passwd: "!"' "$live" && grep -q 'if: .\[ -f /run/cos/live_mode \]' "$live"; then
-  pass "live-system config has key-only install user, a replaced default password and the live guard"
+if [ -s "$live" ] && grep -q 'ssh-ed25519 ' "$live" && grep -q 'passwd: "!"' "$live" \
+   && grep -q 'initramfs.after:' "$live" && grep -q 'if: .\[ -f /run/cos/live_mode \]' "$live" \
+   && ! grep -q 'passwd: "\$' "$live"; then
+  pass "live-system config has the key-only install user, a locked default login and the live guard"
 else
   miss "live-system config is missing or incomplete (/system/oem/50_helios_live.yaml)"
 fi

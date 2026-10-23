@@ -13,7 +13,7 @@ Hadron, so the node can join a k0s cluster as a worker.
 
 **Live (netboot) boot.** On a live boot (`/run/cos/live_mode` exists), `live-oem.yaml`
 creates the install user `mauro` with the owner's public SSH keys and no password, so only a
-key opens it. It replaces the default `kairos` password with a random one nobody knows, and it
+key opens it. It locks the default `kairos` user and removes the root autologin on the local consoles, and it
 enables a login on the AMT serial port. This needs no `config_url`. It does nothing on an
 installed system or in recovery.
 
