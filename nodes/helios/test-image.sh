@@ -25,7 +25,8 @@ cid="$(docker create "$image" /bin/true)"
 docker export "$cid" | tar -x -C "$work" \
   --wildcards 'etc/cos/bootargs.cfg' 'boot/initrd*' 'usr/lib/modules/*' \
   'usr/libc/lib/libnvidia-ml.so.*' 'usr/libc/lib/libcuda.so.*' 'usr/bin/nvidia-smi' \
-  'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' 2>/dev/null || true
+  'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' \
+  'system/oem/50_helios_live.yaml' 'etc/kairos/agent.yaml' 2>/dev/null || true
 
 # 1. The serial console is ttyS4, and ttyS0 is not the default.
 cfg="$work/etc/cos/bootargs.cfg"
@@ -102,6 +103,20 @@ fi
 for f in "usr/libc/lib/libcuda.so.$want_user" "usr/bin/nvidia-smi" "usr/lib/firmware/nvidia/$want_user/gsp_tu10x.bin"; do
   if [ -e "$work/$f" ]; then pass "$f is in the image"; else miss "$f is missing"; fi
 done
+
+# 3c. The live-system config and the agent config in the image are the files in this directory:
+# the key-only install user, the locked default login, and the web installer switched off.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if cmp -s "$work/system/oem/50_helios_live.yaml" "$here/live-oem.yaml"; then
+  pass "live-system config in the image matches live-oem.yaml"
+else
+  miss "live-system config in the image differs from live-oem.yaml, or is missing"
+fi
+if cmp -s "$work/etc/kairos/agent.yaml" "$here/agent.yaml"; then
+  pass "agent config in the image matches agent.yaml (web installer off)"
+else
+  miss "agent config in the image differs from agent.yaml, or is missing"
+fi
 
 # 4. NVIDIA's licence is in the image.
 if [ -s "$work/usr/share/licenses/nvidia-driver/LICENSE.txt" ]; then

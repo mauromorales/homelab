@@ -1,0 +1,43 @@
+name: "helios live system"
+
+# Applies only on a live (netboot) boot, where /run/cos/live_mode exists. Recovery boots
+# use a different marker, and an installed system has neither, so neither is touched.
+#
+# Goal: on a live system only a listed SSH key opens a login.
+# - Kairos sets the default password (kairos) for the kairos user in the initramfs stage,
+#   and it opens the same user on tty1/ttyS0 with a root autologin. yip does not order files
+#   by name across the directory, so the steps here run in initramfs.after, which starts
+#   after every initramfs step. The kairos user is locked, and the autologin overrides go.
+# - The install user mauro gets the owner's public SSH keys and a locked password. It is
+#   created in the network stage because a top-level users: block in a config_url file is
+#   not applied at boot on a netboot live system.
+# - A getty on the AMT Serial-over-LAN port (ttyS4). Every account is locked, so it gives
+#   a login prompt that nobody can pass.
+# - The Kairos web installer on port 8080 is switched off in /etc/kairos/agent.yaml (see the
+#   Dockerfile). Left on, any host on the LAN could install to a disk with its own config.
+stages:
+  initramfs.after:
+    - name: "Lock the default login and remove the root autologin on a live system"
+      if: '[ -f /run/cos/live_mode ] || [ -f /run/cos/uki_install_mode ]'
+      users:
+        kairos:
+          passwd: "!"
+      commands:
+        - rm -f /etc/systemd/system/getty@tty1.service.d/override.conf /etc/systemd/system/serial-getty@ttyS0.service.d/override.conf
+        - ln -sf /usr/lib/systemd/system/serial-getty@.service /etc/systemd/system/getty.target.wants/serial-getty@ttyS4.service
+  network:
+    - name: "Create the install user on a live system"
+      if: '[ -f /run/cos/live_mode ] || [ -f /run/cos/uki_install_mode ]'
+      users:
+        kairos:
+          passwd: "!"
+        mauro:
+          passwd: "!"
+          groups: ["admin"]
+          shell: /bin/bash
+          ssh_authorized_keys:
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEErFJCppTAvi6tBtefN2uawWwFrLhgO3kfA8zZGygA1"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKeztC/ulgeqqeRNE3yEpGwGLDHZGVsxXJ4qr4kK4oxu"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE9pKtr6sEe+NmmEM941CW1vJ+V69DGWz+CpJn++bRtC"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMlncHX7JExB8bgIUG59T/9YHuypHSbuV8A/qNS1RxWE"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOG3waxPIieQPfa+iTVQ2WLZsO8oRnbPx6NIUecK3LoU"
