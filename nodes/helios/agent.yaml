@@ -1,5 +1,5 @@
 # Kairos agent settings for the helios image.
 # The web installer starts on every live boot and takes an install config from any client
-# with no login. The install runs from install-helios.sh over SSH, so switch it off.
+# with no login. An install is done over SSH by the operator, so switch it off.
 webui:
   disable: true
