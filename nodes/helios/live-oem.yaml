@@ -1,0 +1,33 @@
+name: "helios live system"
+
+# Applies only when the image boots as a live system (netboot). The installed system
+# gets its own cloud-config, so none of this runs there.
+#
+# - The user mauro, with the owner's public SSH keys, so the install script can log in.
+# - The default kairos user gets a random password nobody knows. Without this, any
+#   client that netboots the image gets a login with a known default password.
+# - A login on the AMT Serial-over-LAN port (ttyS4).
+#
+# The user is created in the network stage because a top-level users: block in a
+# config_url file is not applied at boot on a netboot live system (tested in a VM).
+stages:
+  network:
+    - name: "Create the install user on a live system"
+      if: 'grep -q "root=live:" /proc/cmdline'
+      users:
+        kairos:
+          passwd: "$6$96x/st3LeD14H21Y$F/D7Z1P8zapqI/lu44IeIpbK5ztM.NiIIFfzPFiUePXNp/eZgwxz/pzvoxIc7u5JB7Df5OIz.choLNNzjI42n0"
+        mauro:
+          groups: ["admin"]
+          shell: /bin/bash
+          ssh_authorized_keys:
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEErFJCppTAvi6tBtefN2uawWwFrLhgO3kfA8zZGygA1"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKeztC/ulgeqqeRNE3yEpGwGLDHZGVsxXJ4qr4kK4oxu"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE9pKtr6sEe+NmmEM941CW1vJ+V69DGWz+CpJn++bRtC"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMlncHX7JExB8bgIUG59T/9YHuypHSbuV8A/qNS1RxWE"
+            - "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOG3waxPIieQPfa+iTVQ2WLZsO8oRnbPx6NIUecK3LoU"
+  initramfs:
+    - name: "Console login on the AMT Serial-over-LAN port of a live system"
+      if: 'grep -q "root=live:" /proc/cmdline'
+      commands:
+        - ln -sf /usr/lib/systemd/system/serial-getty@.service /etc/systemd/system/getty.target.wants/serial-getty@ttyS4.service

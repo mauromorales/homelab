@@ -25,7 +25,8 @@ cid="$(docker create "$image" /bin/true)"
 docker export "$cid" | tar -x -C "$work" \
   --wildcards 'etc/cos/bootargs.cfg' 'boot/initrd*' 'usr/lib/modules/*' \
   'usr/libc/lib/libnvidia-ml.so.*' 'usr/libc/lib/libcuda.so.*' 'usr/bin/nvidia-smi' \
-  'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' 2>/dev/null || true
+  'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' \
+  'system/oem/50_helios_live.yaml' 2>/dev/null || true
 
 # 1. The serial console is ttyS4, and ttyS0 is not the default.
 cfg="$work/etc/cos/bootargs.cfg"
@@ -102,6 +103,14 @@ fi
 for f in "usr/libc/lib/libcuda.so.$want_user" "usr/bin/nvidia-smi" "usr/lib/firmware/nvidia/$want_user/gsp_tu10x.bin"; do
   if [ -e "$work/$f" ]; then pass "$f is in the image"; else miss "$f is missing"; fi
 done
+
+# 3c. The live-system config is in the image: the install user, and a locked default login.
+live="$work/system/oem/50_helios_live.yaml"
+if [ -s "$live" ] && grep -q 'ssh-ed25519 ' "$live" && grep -q 'passwd: "\$6\$' "$live"; then
+  pass "live-system config has the install user keys and a default-user password"
+else
+  miss "live-system config is missing or incomplete (/system/oem/50_helios_live.yaml)"
+fi
 
 # 4. NVIDIA's licence is in the image.
 if [ -s "$work/usr/share/licenses/nvidia-driver/LICENSE.txt" ]; then
