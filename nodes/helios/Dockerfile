@@ -244,5 +244,7 @@ RUN depmod -a $(ls /usr/lib/modules/ | head -1)
 RUN sed -i 's/set baseExtraConsole="console=ttyS0"/set baseExtraConsole="console=ttyS4,115200"/' /etc/cos/bootargs.cfg \
  && grep -q 'baseExtraConsole="console=ttyS4,115200"' /etc/cos/bootargs.cfg
 
-# Install user and serial login for a live (netboot) system. See the file for why.
+# Install user and locked default login for a live (netboot) system, and the web installer off.
+# See the two files for why.
 COPY live-oem.yaml /system/oem/50_helios_live.yaml
+COPY agent.yaml /etc/kairos/agent.yaml

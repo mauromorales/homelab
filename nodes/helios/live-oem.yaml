@@ -11,12 +11,14 @@ name: "helios live system"
 # - The install user mauro gets the owner's public SSH keys and a locked password. It is
 #   created in the network stage because a top-level users: block in a config_url file is
 #   not applied at boot on a netboot live system.
-# - A login getty on the AMT Serial-over-LAN port (ttyS4). Every account is locked there,
-#   so the port gives the boot log and no shell.
+# - A getty on the AMT Serial-over-LAN port (ttyS4). Every account is locked, so it gives
+#   a login prompt that nobody can pass.
+# - The Kairos web installer on port 8080 is switched off in /etc/kairos/agent.yaml (see the
+#   Dockerfile). Left on, any host on the LAN could install to a disk with its own config.
 stages:
   initramfs.after:
     - name: "Lock the default login and remove the root autologin on a live system"
-      if: '[ -f /run/cos/live_mode ]'
+      if: '[ -f /run/cos/live_mode ] || [ -f /run/cos/uki_install_mode ]'
       users:
         kairos:
           passwd: "!"
@@ -25,7 +27,7 @@ stages:
         - ln -sf /usr/lib/systemd/system/serial-getty@.service /etc/systemd/system/getty.target.wants/serial-getty@ttyS4.service
   network:
     - name: "Create the install user on a live system"
-      if: '[ -f /run/cos/live_mode ]'
+      if: '[ -f /run/cos/live_mode ] || [ -f /run/cos/uki_install_mode ]'
       users:
         kairos:
           passwd: "!"
