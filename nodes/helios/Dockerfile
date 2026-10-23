@@ -1,0 +1,245 @@
+# Kairos Hadron NVIDIA amd64. Adapted from kairos-io/hadron examples/add-packages/Dockerfile.nvidia
+# (commit ce78a7c). Changes from the upstream example: the k0s base image, a build arg for the
+# userspace driver version, NVIDIA's licence in the image, and the serial console set to ttyS4.
+#
+# Original upstream header:
+# This Dockerfile demonstrates how to build and add the NVIDIA kernel modules to a Hadron image.
+# Its very important that you use the toolchain image at the same version as the Hadron image you want to extend
+# nvidia modules use the base kernel build to build the modules (Kbuild) so it needs to match the exact version kernel you
+# are going to be run, otherwise it will mismatch and not load the modules during runtime
+ARG HADRON_VERSION=v0.5.1
+# Full Kairos image ref (includes kairos-agent required by NodeOpUpgrade).
+# BASE_IMAGE_TAG must be set explicitly — it's the full quay.io tag, not just HADRON_VERSION.
+ARG BASE_IMAGE=quay.io/kairos/hadron
+ARG BASE_IMAGE_TAG=v0.5.1-standard-amd64-generic-v4.3.0-k0s-v1.36.4-k0s.0
+ARG JOBS=4
+# The open kernel modules must guard their linux/of_gpio.h include with
+# NV_LINUX_OF_GPIO_H_PRESENT, because Linux 7.1 removed that header. 580 includes it
+# unconditionally and does not compile against Hadron v0.5.1 (Linux 7.1.3).
+ARG NVIDIA_VERSION=595.91.07
+# The userspace libraries and firmware version. It equals the kernel module version
+# unless a test builds a deliberate mismatch.
+ARG NVIDIA_USERSPACE_VERSION=${NVIDIA_VERSION}
+ARG TARGETARCH
+# KERNEL_ARCH uses Linux kernel naming (x86_64, arm64) rather than Docker's (amd64, arm64)
+ARG KERNEL_ARCH=x86_64
+
+FROM ghcr.io/kairos-io/hadron-toolchain:${HADRON_VERSION} AS modules-builder
+ARG JOBS
+ARG TARGETARCH
+ARG KERNEL_ARCH
+WORKDIR /build
+# kernel version is stored under /usr/share/kernel-misc/kernel-version file
+# Pull kernel sources so we can build the modules
+# cdn.kernel.org stores the tarballs under vMAJOR.x, so derive that from the version
+# instead of hardcoding it, and let curl fail on the download rather than on the untar
+RUN kver=$(cat /usr/share/kernel-misc/kernel-version) && curl -fL https://cdn.kernel.org/pub/linux/kernel/v${kver%%.*}.x/linux-${kver}.tar.xz -o linux-${kver}.tar.xz
+RUN kver=$(cat /usr/share/kernel-misc/kernel-version) && tar -xf linux-${kver}.tar.xz && mv linux-${kver} linux
+WORKDIR /build/linux
+RUN cp /usr/share/kernel-misc/kernel-config .config
+# Disable module signing cleanly
+RUN ./scripts/config --disable MODULE_SIG
+RUN ./scripts/config --disable MODULE_SIG_ALL
+RUN ARCH=${KERNEL_ARCH} make -s olddefconfig
+RUN ARCH=${KERNEL_ARCH} make -s -j${JOBS} modules_prepare
+RUN cp /usr/share/kernel-misc/Module.symvers .
+ARG NVIDIA_VERSION
+WORKDIR /build
+RUN curl -fL https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/${NVIDIA_VERSION}.tar.gz --output nvidia.tar.gz
+RUN tar -xf nvidia.tar.gz && rm nvidia.tar.gz && mv open-gpu-kernel-modules-${NVIDIA_VERSION} nvidia-modules
+WORKDIR /build/nvidia-modules
+ENV CFLAGS="-Os -pipe"
+ENV LDFLAGS="--gc-sections --as-needed"
+RUN ARCH=${KERNEL_ARCH} KERNEL_UNAME="$(cat /usr/share/kernel-misc/kernel-release)" SYSSRC=/build/linux SYSOUT=/build/linux make -s -j${JOBS} modules
+RUN ARCH=${KERNEL_ARCH} KERNEL_UNAME="$(cat /usr/share/kernel-misc/kernel-release)" SYSSRC=/build/linux SYSOUT=/build/linux ZSTD_CLEVEL=19 INSTALL_MOD_PATH="/output" INSTALL_MOD_STRIP=1 DEPMOD=true make -s -j${JOBS} modules_install
+
+# Create a separate stage to extract the NVIDIA userspace components, which we can then add to the Hadron image as well.
+# As the nvdia userspace components are linked against glibc, we also need to copy the glibc runtime libraries to ensure they can run properly in the musl-based Hadron image.
+# We can do this by copying the necessary .so files from the builder stage, which is based on Ubuntu and has glibc, to a separate output directory.
+# We can then add this directory to the Hadron image as well as well as the libc components
+# Then we create a libc wrapper that sets the library path to point to the glibc libraries we copied,
+# and use the glibc dynamic linker to run the NVIDIA userspace binaries with the correct library path.
+FROM ubuntu:24.04 AS nvidia-builder
+
+ARG NVIDIA_VERSION
+ARG NVIDIA_USERSPACE_VERSION
+ARG OUTPUT=/output
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y \
+        ca-certificates \
+        curl \
+        xz-utils \
+        libstdc++6 \
+        libgcc-s1 \
+        nvidia-modprobe && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+
+# Download NVIDIA redistributable driver archive
+ARG TARGETARCH
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+    curl -fL https://developer.download.nvidia.com/compute/nvidia-driver/redist/nvidia_driver/linux-x86_64/nvidia_driver-linux-x86_64-${NVIDIA_USERSPACE_VERSION}-archive.tar.xz -o nvidia.tar.xz; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+    curl -fL https://developer.download.nvidia.com/compute/nvidia-driver/redist/nvidia_driver/linux-sbsa/nvidia_driver-linux-sbsa-${NVIDIA_USERSPACE_VERSION}-archive.tar.xz -o nvidia.tar.xz; \
+    else echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+    fi
+
+# Pinned checksum of the amd64 archive for one driver version, from NVIDIA's redistrib manifest.
+# A different userspace version has no pinned value and is built unverified, on purpose (the mismatch test).
+ARG NVIDIA_DRIVER_SHA256_VERSION=595.91.07
+ARG NVIDIA_DRIVER_SHA256_AMD64=93e0487897e843be767a3d259dffea8ac32dffff846e83df8d3abbf30be754ae
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      if [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_DRIVER_SHA256_VERSION" ]; then \
+        echo "${NVIDIA_DRIVER_SHA256_AMD64}  nvidia.tar.xz" | sha256sum -c -; \
+      elif [ "$NVIDIA_USERSPACE_VERSION" = "$NVIDIA_VERSION" ]; then \
+        echo "No pinned sha256 for driver ${NVIDIA_VERSION}. Update NVIDIA_DRIVER_SHA256_VERSION and NVIDIA_DRIVER_SHA256_AMD64." >&2; exit 1; \
+      fi; \
+    fi
+RUN tar -xf nvidia.tar.xz --strip-components=1 && rm nvidia.tar.xz
+RUN test -s LICENSE
+
+# Prepare output layout
+RUN mkdir -p ${OUTPUT}/usr/libc/lib \
+             ${OUTPUT}/usr/bin \
+             ${OUTPUT}/usr/lib/firmware/nvidia/${NVIDIA_USERSPACE_VERSION} \
+             ${OUTPUT}/etc/modprobe.d/
+
+
+# ---- Copy NVIDIA compute userspace ----
+RUN set -eux; \
+  for f in \
+    libcuda.so* \
+    libnvidia-ml.so* \
+    libnvidia-ptxjitcompiler.so* \
+    libnvidia-nvvm.so* \
+    libnvidia-nvvm70.so* \
+    libnvidia-gpucomp.so* \
+    libnvidia-rtcore.so* \
+    libnvoptix.so* \
+    libcudadebugger.so* \
+    libnvcuvid.so* \
+    libnvidia-opencl.so* \
+    libOpenCL.so* \
+    libnvidia-sandboxutils.so* \
+    libnvidia-tls.so* \
+    libnvidia-api.so* \
+    libnvidia-allocator.so* \
+  ; do \
+    cp -L lib/$f ${OUTPUT}/usr/libc/lib/ 2>/dev/null || true; \
+  done
+
+# Create symlinks for .so.1 versions
+RUN cd ${OUTPUT}/usr/libc/lib && \
+  for real in lib*.so.*.*; do \
+    base=$(echo "$real" | sed -E 's/\.so\..*/.so.1/'); \
+    ln -sf "$real" "$base"; \
+  done
+
+# Tools
+RUN cp -a sbin/nvidia-smi ${OUTPUT}/usr/bin/
+RUN cp -a sbin/nvidia-cuda-mps-server ${OUTPUT}/usr/bin/
+RUN cp -a sbin/nvidia-cuda-mps-control ${OUTPUT}/usr/bin/
+
+# nvidia-modprobe: creates /dev/nvidia* device nodes when the kernel module loads.
+# Without it the modules load at boot but udev never creates the device files,
+# so nvidia-smi fails with "couldn't communicate with the NVIDIA driver".
+# nvidia-modprobe is version-independent (reads major numbers from /proc/devices),
+# so the apt package version does not need to match the driver version.
+RUN cp -a /usr/bin/nvidia-modprobe ${OUTPUT}/usr/bin/nvidia-modprobe
+
+# udev rules: create /dev/nvidia0 when nvidia module loads, /dev/nvidia-uvm when nvidia_uvm loads.
+# -c 0 creates the GPU character device; -u (without -c) creates the UVM device.
+# Do NOT combine -c 0 -u in one call — -u means "UVM mode instead of GPU mode",
+# which suppresses /dev/nvidia0 creation and leaves the GPU inaccessible.
+RUN mkdir -p ${OUTPUT}/etc/udev/rules.d && \
+    printf 'SUBSYSTEM=="module", ACTION=="add", KERNEL=="nvidia", RUN+="/usr/bin/nvidia-modprobe -c 0"\nSUBSYSTEM=="module", ACTION=="add", KERNEL=="nvidia_uvm", RUN+="/usr/bin/nvidia-modprobe -u"\n' \
+    > ${OUTPUT}/etc/udev/rules.d/71-nvidia.rules
+
+# ---- Copy glibc runtime ----
+# DIR_ARCH: multiarch directory name (x86_64, aarch64)
+# FILE_ARCH: ld-linux filename suffix (x86-64, aarch64)
+RUN set -eux; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+        DIR_ARCH="x86_64"; FILE_ARCH="x86-64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then \
+        DIR_ARCH="aarch64"; FILE_ARCH="aarch64"; \
+    else echo "Unsupported architecture: $TARGETARCH" && exit 1; \
+    fi; \
+    GLIBC=/lib/${DIR_ARCH}-linux-gnu; \
+    cp -L $GLIBC/ld-linux-${FILE_ARCH}.so* ${OUTPUT}/usr/lib/; \
+    cp -L $GLIBC/libc.so.6 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libpthread.so.0 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libm.so.6 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libdl.so.2 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/librt.so.1 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libresolv.so.2 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libstdc++.so.6 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libgcc_s.so.1 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libnsl.so.1 ${OUTPUT}/usr/libc/lib/; \
+    cp -L $GLIBC/libcrypt.so.1 ${OUTPUT}/usr/libc/lib/
+
+# Copy a ld.so.conf that only glibc reads to know where its libs are so it can find them when running the NVIDIA userspace binaries
+# This way we have a transparent layer of glibc runtime libraries that only the glibc-linked binaries use,
+# and we can keep the rest of the Hadron image musl-based and lightweight, while still being able to run the NVIDIA userspace components properly.
+# we create the conf file and with that create the cache with ldconfig which is what libc reads
+RUN echo "/usr/libc/lib" > ${OUTPUT}/etc/ld.so.conf
+RUN ldconfig -r ${OUTPUT} -f /etc/ld.so.conf
+
+# NVIDIA's licence goes with the binaries (section 1.1(d) of the Agreement).
+RUN mkdir -p ${OUTPUT}/usr/share/licenses/nvidia-driver && cp LICENSE ${OUTPUT}/usr/share/licenses/nvidia-driver/LICENSE.txt
+
+# Copy the firmware, this needs the version as each version stores it in a separated folder
+RUN cp -a firmware/* ${OUTPUT}/usr/lib/firmware/nvidia/${NVIDIA_USERSPACE_VERSION}/
+
+# blacklist nouveau driver by adding a conf file to modprobe.d,
+# this way the modules will autoload and not collide with nouveau
+RUN echo "blacklist nouveau" > ${OUTPUT}/etc/modprobe.d/blacklist-nouveau.conf
+
+# The NVIDIA container runtime hook mounts the host's /sbin/ldconfig into GPU
+# containers so they can rebuild their ld.so cache. Hadron (musl) ships no ldconfig;
+# without it the hook fails with "stat /sbin/ldconfig: no such file or directory"
+# and GPU pods cannot start.
+#
+# On Hadron the layout is:  /sbin -> usr/bin   AND   /usr/sbin -> bin
+# Both /sbin/ldconfig and /usr/sbin/ldconfig therefore resolve to /usr/bin/ldconfig.
+#
+# CRITICAL: do NOT create ${OUTPUT}/usr/sbin/ in this stage. Because we COPY this
+# stage with `--link`, BuildKit overlays the directory entry — and a real directory
+# in our layer would replace the base image's /usr/sbin symlink with an (almost
+# empty) real directory, hiding every binary normally reachable via /usr/sbin
+# (modprobe, init, systemctl, iptables, ...). That in turn breaks the kernel's
+# request_module() auto-loading (kernel reads /proc/sys/kernel/modprobe =
+# /usr/sbin/modprobe), so Cilium fails with "operation not supported" when
+# creating veth/vxlan devices and the whole CNI stack collapses.
+#
+# Place the binary at /usr/bin/ldconfig: the base /usr/bin is a real directory
+# and a normal merge, and all of /sbin/ldconfig, /usr/sbin/ldconfig and
+# /usr/bin/ldconfig resolve here. On Ubuntu 24.04 /sbin/ldconfig is a 387-byte
+# wrapper script that delegates to /sbin/ldconfig.real — copy the real glibc
+# binary directly, not the wrapper.
+RUN cp -a /sbin/ldconfig.real ${OUTPUT}/usr/bin/ldconfig
+
+# This target will copy the built libs or binaries binaries to a minimal image.
+# We can then use this as a layer on top of Hadron to extend it like
+# FROM ghcr.io/kairos-io/hadron:VERSION
+# COPY --from=OUR_IMAGE_NAME:TAG / /
+# Or create a sysextension with the help of Auroraboot (https://github.com/kairos-io/auroraboot)
+FROM scratch AS default
+COPY --from=modules-builder /output/ /usr/
+COPY --from=nvidia-builder /output/ /
+
+FROM ${BASE_IMAGE}:${BASE_IMAGE_TAG} AS hadron-extension
+COPY --link --from=modules-builder /output/ /usr/
+COPY --link --from=nvidia-builder /output/ /
+# Regenerate modules.dep with the full module tree (base kernel + nvidia).
+# The modules-builder depmod only saw nvidia modules, overwriting the base image's modules.dep.
+RUN depmod -a $(ls /usr/lib/modules/ | head -1)
+
+# Serial console on ttyS4 (AMT Serial-over-LAN on the HP Z4 G4). Kairos sets
+# baseExtraConsole to console=ttyS0 for every model it does not list. The 8250 driver gives
+# one serial console and the first one wins, so this must change in the image.
+RUN sed -i 's/set baseExtraConsole="console=ttyS0"/set baseExtraConsole="console=ttyS4,115200"/' /etc/cos/bootargs.cfg \
+ && grep -q 'baseExtraConsole="console=ttyS4,115200"' /etc/cos/bootargs.cfg

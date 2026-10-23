@@ -1,0 +1,126 @@
+name: 'Build Kairos Hadron NVIDIA image'
+
+# Builds the image, checks it with test-image.sh, and pushes it to quay.io.
+# On push and pull request the tag expires after 2 days. On workflow_dispatch
+# with a tag, the image is durable.
+on:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'nodes/helios/**'
+      - '.github/workflows/build-helios.yaml'
+  pull_request:
+    paths:
+      - 'nodes/helios/**'
+      - '.github/workflows/build-helios.yaml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Durable image tag, e.g. v0.5.1-nvidia-595.91.07-k0s-v1.36.4-r1. Leave empty for an expiring test tag.'
+        required: false
+        type: string
+      nvidia_userspace_version:
+        description: 'Userspace driver version. Leave empty to match the kernel module. A different value builds a deliberate mismatch.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helios-${{ github.event_name }}-${{ inputs.tag || github.ref }}
+
+env:
+  IMAGE: quay.io/mauromorales/helios
+  NVIDIA_VERSION: '595.91.07'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Choose the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [ -n "$INPUT_TAG" ]; then
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "A durable tag can only be pushed from main." >&2; exit 1
+            fi
+            if [[ ! "$INPUT_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$ ]]; then
+              echo "Bad tag." >&2; exit 1
+            fi
+            # Only a clear "not found" answer lets the push go on. Any other failure stops the run.
+            if out="$(docker manifest inspect "${IMAGE}:${INPUT_TAG}" 2>&1)"; then
+              echo "Tag ${INPUT_TAG} already exists. Pick a new one." >&2; exit 1
+            elif ! printf '%s' "$out" | grep -qi -E 'manifest unknown|no such manifest'; then
+              echo "Cannot tell if the tag exists: $out" >&2; exit 1
+            fi
+            echo "value=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+            echo "expires=" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=test-${HEAD_SHA::12}" >> "$GITHUB_OUTPUT"
+            echo "expires=2d" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Choose the userspace version
+        id: user
+        env:
+          INPUT_USER: ${{ inputs.nvidia_userspace_version }}
+        run: |
+          v="${INPUT_USER:-$NVIDIA_VERSION}"
+          if [[ ! "$v" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Bad userspace version." >&2; exit 1
+          fi
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: nodes/helios
+          build-args: |
+            JOBS=2
+            NVIDIA_VERSION=${{ env.NVIDIA_VERSION }}
+            NVIDIA_USERSPACE_VERSION=${{ steps.user.outputs.value }}
+          labels: |
+            ${{ steps.tag.outputs.expires != '' && format('quay.expires-after={0}', steps.tag.outputs.expires) || '' }}
+          tags: helios:ci
+          load: true
+
+      - name: Install the check tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dracut-core zstd kmod
+
+      - name: Check the image
+        env:
+          USER_VERSION: ${{ steps.user.outputs.value }}
+        run: |
+          nodes/helios/test-image.sh helios:ci \
+            "${NVIDIA_VERSION}" "${USER_VERSION}"
+
+      # Pull requests from forks have no secrets, so they stop after the check.
+      - name: Login to Quay
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: docker/login-action@v4
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Push
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          docker tag helios:ci "${IMAGE}:${TAG}"
+          docker push "${IMAGE}:${TAG}"
+          echo "Pushed ${IMAGE}:${TAG}" >> "$GITHUB_STEP_SUMMARY"
