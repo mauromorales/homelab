@@ -26,7 +26,8 @@ docker export "$cid" | tar -x -C "$work" \
   --wildcards 'etc/cos/bootargs.cfg' 'boot/initrd*' 'usr/lib/modules/*' \
   'usr/libc/lib/libnvidia-ml.so.*' 'usr/libc/lib/libcuda.so.*' 'usr/bin/nvidia-smi' \
   'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' \
-  'system/oem/50_helios_live.yaml' 'etc/kairos/agent.yaml' 2>/dev/null || true
+  'system/oem/50_helios_live.yaml' 'etc/kairos/agent.yaml' \
+  'usr/bin/nvidia-ctk' 'usr/bin/nvidia-cdi-hook' 2>/dev/null || true
 
 # 1. The serial console is ttyS4, and ttyS0 is not the default.
 cfg="$work/etc/cos/bootargs.cfg"
@@ -103,6 +104,18 @@ fi
 for f in "usr/libc/lib/libcuda.so.$want_user" "usr/bin/nvidia-smi" "usr/lib/firmware/nvidia/$want_user/gsp_tu10x.bin"; do
   if [ -e "$work/$f" ]; then pass "$f is in the image"; else miss "$f is missing"; fi
 done
+
+# 3b2. The container toolkit binaries a device plugin needs are there, and the hook runs on this
+# image at the version the plugin expects.
+want_ctk="${NVIDIA_CTK_VERSION:-1.20.1}"
+for f in usr/bin/nvidia-ctk usr/bin/nvidia-cdi-hook; do
+  if [ -x "$work/$f" ]; then pass "$f is in the image"; else miss "$f is missing"; fi
+done
+hookver="$(docker run --rm --entrypoint /usr/bin/nvidia-cdi-hook "$image" --version 2>&1 | head -n 3 || true)"
+case "$hookver" in
+  *"$want_ctk"*) pass "nvidia-cdi-hook runs and reports $want_ctk" ;;
+  *) miss "nvidia-cdi-hook did not report $want_ctk (got: ${hookver:-nothing})" ;;
+esac
 
 # 3c. The live-system config and the agent config in the image are the files in this directory:
 # the locked default login and no user, and the web installer switched off.

@@ -150,6 +150,25 @@ RUN cp -a sbin/nvidia-cuda-mps-control ${OUTPUT}/usr/bin/
 # so the apt package version does not need to match the driver version.
 RUN cp -a /usr/bin/nvidia-modprobe ${OUTPUT}/usr/bin/nvidia-modprobe
 
+# NVIDIA container toolkit, only the two binaries a Kubernetes device plugin needs on the node:
+# nvidia-ctk and nvidia-cdi-hook (they come in the nvidia-container-toolkit-base package). The
+# plugin writes the CDI spec at run time and points containerd at the hook. The version must match
+# the toolkit the device plugin chart bundles; a plugin newer than the node's hook can fail with
+# "flag provided but not defined". They go in /usr/bin, a real directory.
+ARG NVIDIA_CTK_VERSION=1.20.1
+ARG NVIDIA_CTK_SHA256_AMD64=14dc22489851d4f1a6d1bbfdfb51524c8f110091738570cddaddc09778a63ad9
+RUN set -eux; \
+    if [ "$TARGETARCH" = "amd64" ]; then \
+      curl -fsSL -o ctk.tar.gz "https://github.com/NVIDIA/nvidia-container-toolkit/releases/download/v${NVIDIA_CTK_VERSION}/nvidia-container-toolkit_${NVIDIA_CTK_VERSION}_deb_amd64.tar.gz"; \
+      echo "${NVIDIA_CTK_SHA256_AMD64}  ctk.tar.gz" | sha256sum -c -; \
+      mkdir ctk && tar -xzf ctk.tar.gz -C ctk; \
+      deb="$(find ctk -path '*/ubuntu18.04/amd64/nvidia-container-toolkit-base_*_amd64.deb' | head -n 1)"; \
+      test -n "$deb"; \
+      dpkg-deb -x "$deb" ctk/base; \
+      install -m 755 ctk/base/usr/bin/nvidia-ctk ctk/base/usr/bin/nvidia-cdi-hook ${OUTPUT}/usr/bin/; \
+      rm -rf ctk ctk.tar.gz; \
+    fi
+
 # udev rules: create /dev/nvidia0 when nvidia module loads, /dev/nvidia-uvm when nvidia_uvm loads.
 # -c 0 creates the GPU character device; -u (without -c) creates the UVM device.
 # Do NOT combine -c 0 -u in one call — -u means "UVM mode instead of GPU mode",
