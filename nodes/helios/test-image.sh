@@ -105,7 +105,7 @@ for f in "usr/libc/lib/libcuda.so.$want_user" "usr/bin/nvidia-smi" "usr/lib/firm
 done
 
 # 3c. The live-system config and the agent config in the image are the files in this directory:
-# the key-only install user, the locked default login, and the web installer switched off.
+# the locked default login and no user, and the web installer switched off.
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if cmp -s "$work/system/oem/50_helios_live.yaml" "$here/live-oem.yaml"; then
   pass "live-system config in the image matches live-oem.yaml"

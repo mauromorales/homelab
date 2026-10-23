@@ -11,11 +11,12 @@ Hadron, so the node can join a k0s cluster as a worker.
 | Image | `quay.io/mauromorales/helios` |
 | Tag | `v0.5.1-nvidia-595.91.07-k0s-v1.36.4-r<N>` |
 
-**Live (netboot) boot.** On a live boot (`/run/cos/live_mode` exists), `live-oem.yaml`
-creates the install user `mauro` with the owner's public SSH keys and no password, so only a
-key opens it. It locks the default `kairos` user and removes the root autologin on the local consoles, and it
-enables a login on the AMT serial port. This needs no `config_url`. It does nothing on an
-installed system or in recovery.
+**Live boot.** On a live boot (`/run/cos/live_mode` or `/run/cos/uki_install_mode` exists), `live-oem.yaml` locks the default
+`kairos` user, removes the root autologin on the local consoles, and enables a login prompt on the
+serial port `ttyS4`. The Kairos web installer is off (`agent.yaml`). The image ships no user and no
+key. To log in, boot it with your own cloud-config, for example the config of an ISO built from the
+image. Create a user other than `kairos`: the image keeps `kairos` locked, and it locks it again after
+your config ran. It does nothing on an installed system or in recovery.
 
 The `Dockerfile` is adapted from the
 [`examples/add-packages/Dockerfile.nvidia`](https://github.com/kairos-io/hadron/blob/ce78a7c/examples/add-packages/Dockerfile.nvidia)
