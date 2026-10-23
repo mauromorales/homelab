@@ -104,10 +104,12 @@ for f in "usr/libc/lib/libcuda.so.$want_user" "usr/bin/nvidia-smi" "usr/lib/firm
   if [ -e "$work/$f" ]; then pass "$f is in the image"; else miss "$f is missing"; fi
 done
 
-# 3c. The live-system config is in the image: the install user, and a locked default login.
+# 3c. The live-system config is in the image: key-only install user, replaced default password,
+# and a guard that limits it to a live boot.
 live="$work/system/oem/50_helios_live.yaml"
-if [ -s "$live" ] && grep -q 'ssh-ed25519 ' "$live" && grep -q 'passwd: "\$6\$' "$live"; then
-  pass "live-system config has the install user keys and a default-user password"
+if [ -s "$live" ] && grep -q 'ssh-ed25519 ' "$live" && grep -q 'passwd: "\$6\$' "$live" \
+   && grep -q 'passwd: "!"' "$live" && grep -q 'if: .\[ -f /run/cos/live_mode \]' "$live"; then
+  pass "live-system config has key-only install user, a replaced default password and the live guard"
 else
   miss "live-system config is missing or incomplete (/system/oem/50_helios_live.yaml)"
 fi
