@@ -150,9 +150,12 @@ RUN cp -a sbin/nvidia-cuda-mps-control ${OUTPUT}/usr/bin/
 # so the apt package version does not need to match the driver version.
 RUN cp -a /usr/bin/nvidia-modprobe ${OUTPUT}/usr/bin/nvidia-modprobe
 
-# NVIDIA container toolkit, only the two binaries a Kubernetes device plugin needs on the node:
-# nvidia-ctk and nvidia-cdi-hook (they come in the nvidia-container-toolkit-base package). The
-# plugin writes the CDI spec at run time and points containerd at the hook. The version must match
+# NVIDIA container toolkit, only the three binaries a Kubernetes device plugin needs on the node:
+# nvidia-ctk, nvidia-cdi-hook and nvidia-container-runtime (they come in the
+# nvidia-container-toolkit-base package). The plugin writes the CDI spec at run time and points
+# containerd at the hook. The plugin pod itself runs under the "nvidia" runtime class, whose
+# containerd handler (nodes/helios/nvidia-runtime-oem.yaml) calls nvidia-container-runtime; that is
+# how the plugin pod gets /dev/nvidia* without being privileged. The version must match
 # the toolkit the device plugin chart bundles; a plugin newer than the node's hook can fail with
 # "flag provided but not defined". They go in /usr/bin, a real directory.
 ARG NVIDIA_CTK_VERSION=1.20.1
@@ -165,7 +168,7 @@ RUN set -eux; \
       deb="$(find ctk -path '*/ubuntu18.04/amd64/nvidia-container-toolkit-base_*_amd64.deb' | head -n 1)"; \
       test -n "$deb"; \
       dpkg-deb -x "$deb" ctk/base; \
-      install -m 755 ctk/base/usr/bin/nvidia-ctk ctk/base/usr/bin/nvidia-cdi-hook ${OUTPUT}/usr/bin/; \
+      install -m 755 ctk/base/usr/bin/nvidia-ctk ctk/base/usr/bin/nvidia-cdi-hook ctk/base/usr/bin/nvidia-container-runtime ${OUTPUT}/usr/bin/; \
       rm -rf ctk ctk.tar.gz; \
     fi
 
@@ -275,4 +278,5 @@ RUN sed -i 's/set baseExtraConsole="console=ttyS0"/set baseExtraConsole="console
 # Locked default login for a live system, and the web installer off. No user and no key.
 # See the two files for why.
 COPY live-oem.yaml /system/oem/50_helios_live.yaml
+COPY nvidia-runtime-oem.yaml /system/oem/60_helios_nvidia_runtime.yaml
 COPY agent.yaml /etc/kairos/agent.yaml
