@@ -222,23 +222,23 @@ RUN echo "blacklist nouveau" > ${OUTPUT}/etc/modprobe.d/blacklist-nouveau.conf
 # without it the hook fails with "stat /sbin/ldconfig: no such file or directory"
 # and GPU pods cannot start.
 #
-# On Hadron the layout is:  /sbin -> usr/bin   AND   /usr/sbin -> bin
-# Both /sbin/ldconfig and /usr/sbin/ldconfig therefore resolve to /usr/bin/ldconfig.
+# On Hadron the layout is:  /sbin -> usr/sbin   AND   /bin -> usr/bin, and /usr/sbin
+# is a real directory (seen on a running node). It holds no ldconfig, so the
+# hadron-extension stage below links /usr/sbin/ldconfig to /usr/bin/ldconfig.
 #
-# CRITICAL: do NOT create ${OUTPUT}/usr/sbin/ in this stage. Because we COPY this
-# stage with `--link`, BuildKit overlays the directory entry — and a real directory
-# in our layer would replace the base image's /usr/sbin symlink with an (almost
-# empty) real directory, hiding every binary normally reachable via /usr/sbin
-# (modprobe, init, systemctl, iptables, ...). That in turn breaks the kernel's
-# request_module() auto-loading (kernel reads /proc/sys/kernel/modprobe =
-# /usr/sbin/modprobe), so Cilium fails with "operation not supported" when
-# creating veth/vxlan devices and the whole CNI stack collapses.
+# CRITICAL: do NOT create ${OUTPUT}/usr/sbin/ in this stage. We COPY this stage with
+# `--link`, so BuildKit overlays the directory entry, and a directory in our layer
+# would replace the base image's /usr/sbin with an almost empty one. That hides every
+# binary reachable via /usr/sbin (modprobe, init, systemctl, iptables, ...), and it
+# breaks the kernel's request_module() auto-loading (the kernel reads
+# /proc/sys/kernel/modprobe = /usr/sbin/modprobe), so Cilium fails with "operation not
+# supported" when it creates veth/vxlan devices and the whole CNI stack collapses.
 #
-# Place the binary at /usr/bin/ldconfig: the base /usr/bin is a real directory
-# and a normal merge, and all of /sbin/ldconfig, /usr/sbin/ldconfig and
-# /usr/bin/ldconfig resolve here. On Ubuntu 24.04 /sbin/ldconfig is a 387-byte
-# wrapper script that delegates to /sbin/ldconfig.real — copy the real glibc
-# binary directly, not the wrapper.
+# So the binary goes to /usr/bin/ldconfig (the base /usr/bin is a real directory and a
+# normal merge). The link /usr/sbin/ldconfig is made later, by a RUN in the
+# hadron-extension stage, which adds one entry to the existing /usr/sbin.
+# On Ubuntu 24.04 /sbin/ldconfig is a 387-byte wrapper script that delegates to
+# /sbin/ldconfig.real: copy the real glibc binary directly, not the wrapper.
 RUN cp -a /sbin/ldconfig.real ${OUTPUT}/usr/bin/ldconfig
 
 # This target will copy the built libs or binaries binaries to a minimal image.
@@ -253,6 +253,15 @@ COPY --from=nvidia-builder /output/ /
 FROM ${BASE_IMAGE}:${BASE_IMAGE_TAG} AS hadron-extension
 COPY --link --from=modules-builder /output/ /usr/
 COPY --link --from=nvidia-builder /output/ /
+# Two links the GPU needs on Hadron. A RUN link goes into the existing /usr/sbin; it
+# does not replace the directory (see the warning above).
+# - /usr/sbin/ldconfig: the CDI hook opens /sbin/ldconfig, which is /usr/sbin/ldconfig.
+# - /usr/lib64/libnvidia-ml.so.1: the device plugin looks for NVML only in the standard
+#   lib folders under its driver root. The driver libraries are in /usr/libc/lib. The
+#   link is relative so it still resolves when the plugin mounts the host root.
+RUN ln -s ../bin/ldconfig /usr/sbin/ldconfig && \
+    mkdir -p /usr/lib64 && \
+    ln -s ../libc/lib/libnvidia-ml.so.1 /usr/lib64/libnvidia-ml.so.1
 # Regenerate modules.dep with the full module tree (base kernel + nvidia).
 # The modules-builder depmod only saw nvidia modules, overwriting the base image's modules.dep.
 RUN depmod -a $(ls /usr/lib/modules/ | head -1)

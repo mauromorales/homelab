@@ -10,6 +10,7 @@ want="${2:-595.91.07}"
 want_user="${3:-$want}"
 
 work="$(mktemp -d "${TMPDIR:-/var/tmp}/test-image.XXXXXX")"
+work="$(cd "$work" && pwd -P)"
 cid=""
 cleanup() {
   [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1 || true
@@ -27,7 +28,8 @@ docker export "$cid" | tar -x -C "$work" \
   'usr/libc/lib/libnvidia-ml.so.*' 'usr/libc/lib/libcuda.so.*' 'usr/bin/nvidia-smi' \
   'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' \
   'system/oem/50_helios_live.yaml' 'etc/kairos/agent.yaml' \
-  'usr/bin/nvidia-ctk' 'usr/bin/nvidia-cdi-hook' 2>/dev/null || true
+  'usr/bin/nvidia-ctk' 'usr/bin/nvidia-cdi-hook' \
+  'usr/sbin/*' 'usr/bin/ldconfig' 'usr/lib64/*' 2>/dev/null || true
 
 # 1. The serial console is ttyS4, and ttyS0 is not the default.
 cfg="$work/etc/cos/bootargs.cfg"
@@ -115,6 +117,30 @@ hookver="$(docker run --rm --entrypoint /usr/bin/nvidia-cdi-hook "$image" --vers
 case "$hookver" in
   *"$want_ctk"*) pass "nvidia-cdi-hook runs and reports $want_ctk" ;;
   *) miss "nvidia-cdi-hook did not report $want_ctk (got: ${hookver:-nothing})" ;;
+esac
+
+# 3b3. Two links the GPU needs on Hadron. The CDI hook opens /sbin/ldconfig (/sbin is usr/sbin),
+# and the device plugin looks for NVML in /usr/lib64 under its driver root. And /usr/sbin must stay
+# the base image's real directory: a replaced one hides modprobe and breaks the CNI.
+if [ -d "$work/usr/sbin" ] && [ ! -L "$work/usr/sbin" ] && { [ -e "$work/usr/sbin/modprobe" ] || [ -L "$work/usr/sbin/modprobe" ]; }; then
+  pass "usr/sbin is a real directory and still holds modprobe"
+else
+  miss "usr/sbin is not the base image's real directory with modprobe"
+fi
+if [ -L "$work/usr/sbin/ldconfig" ] && [ "$(readlink -f "$work/usr/sbin/ldconfig")" = "$work/usr/bin/ldconfig" ] && [ -x "$work/usr/bin/ldconfig" ]; then
+  pass "usr/sbin/ldconfig resolves to usr/bin/ldconfig"
+else
+  miss "usr/sbin/ldconfig does not resolve to usr/bin/ldconfig"
+fi
+if [ -L "$work/usr/lib64/libnvidia-ml.so.1" ] && [ "$(readlink -f "$work/usr/lib64/libnvidia-ml.so.1")" = "$work/usr/libc/lib/libnvidia-ml.so.$want_user" ]; then
+  pass "usr/lib64/libnvidia-ml.so.1 resolves to usr/libc/lib/libnvidia-ml.so.$want_user"
+else
+  miss "usr/lib64/libnvidia-ml.so.1 does not resolve to the driver's libnvidia-ml.so.$want_user"
+fi
+ldver="$(docker run --rm --entrypoint /usr/sbin/ldconfig "$image" --version 2>&1 | head -n 1 || true)"
+case "$ldver" in
+  *GLIBC*) pass "/usr/sbin/ldconfig runs and is glibc ($ldver)" ;;
+  *) miss "/usr/sbin/ldconfig did not report GLIBC (got: ${ldver:-nothing})" ;;
 esac
 
 # 3c. The live-system config and the agent config in the image are the files in this directory:
