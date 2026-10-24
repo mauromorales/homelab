@@ -1,0 +1,22 @@
+name: "helios nvidia runtime for containerd"
+
+# Adds a containerd runtime handler "nvidia" to k0s. k0s reads every *.toml in
+# /etc/k0s/containerd.d and merges it into its containerd config. A pod with
+# runtimeClassName: nvidia (the device plugin pod) runs through nvidia-container-runtime, which
+# gives the pod the GPU device nodes and driver libraries. Pods with no runtime class keep the
+# default runc handler.
+stages:
+  initramfs:
+    - name: "Add the nvidia runtime handler to the k0s containerd config"
+      directories:
+        - path: /etc/k0s/containerd.d
+          permissions: 0755
+      files:
+        - path: /etc/k0s/containerd.d/nvidia.toml
+          permissions: 0644
+          content: |
+            version = 3
+            [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.nvidia]
+              runtime_type = "io.containerd.runc.v2"
+              [plugins."io.containerd.cri.v1.runtime".containerd.runtimes.nvidia.options]
+                BinaryName = "/usr/bin/nvidia-container-runtime"

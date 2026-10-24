@@ -28,7 +28,8 @@ docker export "$cid" | tar -x -C "$work" \
   'usr/libc/lib/libnvidia-ml.so.*' 'usr/libc/lib/libcuda.so.*' 'usr/bin/nvidia-smi' \
   'usr/lib/firmware/nvidia/*' 'usr/share/licenses/nvidia-driver/*' \
   'system/oem/50_helios_live.yaml' 'etc/kairos/agent.yaml' \
-  'usr/bin/nvidia-ctk' 'usr/bin/nvidia-cdi-hook' \
+  'usr/bin/nvidia-ctk' 'usr/bin/nvidia-cdi-hook' 'usr/bin/nvidia-container-runtime' \
+  'system/oem/60_helios_nvidia_runtime.yaml' \
   'usr/sbin/*' 'usr/bin/ldconfig' 'usr/lib64/*' 2>/dev/null || true
 
 # 1. The serial console is ttyS4, and ttyS0 is not the default.
@@ -118,6 +119,22 @@ case "$hookver" in
   *"$want_ctk"*) pass "nvidia-cdi-hook runs and reports $want_ctk" ;;
   *) miss "nvidia-cdi-hook did not report $want_ctk (got: ${hookver:-nothing})" ;;
 esac
+
+# 3b2b. The runtime the device plugin pod runs under (runtimeClassName: nvidia): the binary runs
+# at the toolkit version, and the containerd drop-in that names it is in the image.
+if [ -x "$work/usr/bin/nvidia-container-runtime" ]; then pass "usr/bin/nvidia-container-runtime is in the image"; else miss "usr/bin/nvidia-container-runtime is missing"; fi
+rtver="$(docker run --rm --entrypoint /usr/bin/nvidia-container-runtime "$image" --version 2>&1 | head -n 3 || true)"
+case "$rtver" in
+  *"$want_ctk"*) pass "nvidia-container-runtime runs and reports $want_ctk" ;;
+  *) miss "nvidia-container-runtime did not report $want_ctk (got: ${rtver:-nothing})" ;;
+esac
+rtoem="$work/system/oem/60_helios_nvidia_runtime.yaml"
+if [ -f "$rtoem" ] && grep -q 'BinaryName = "/usr/bin/nvidia-container-runtime"' "$rtoem" && grep -q 'version = 3' "$rtoem" \
+   && grep -q 'containerd.runtimes.nvidia\]' "$rtoem"; then
+  pass "the containerd nvidia handler config is in the image"
+else
+  miss "the containerd nvidia handler config is missing or wrong"
+fi
 
 # 3b3. Two links the GPU needs on Hadron. The CDI hook opens /sbin/ldconfig (/sbin is usr/sbin),
 # and the device plugin looks for NVML in /usr/lib64 under its driver root. And /usr/sbin must stay
