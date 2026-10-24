@@ -415,9 +415,11 @@ stages:
         - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
     - name: "Trust fleet.home.arpa's certificate"
       files:
-        # Public cert only, self-signed today. Re-issuing this from an
-        # internal CA later is a content swap in this same file -- no change
-        # to how it's trusted.
+        # Public cert only, self-signed today. The fleet server's certificate
+        # is going to be re-issued from the apps.home.arpa CA. This stanza
+        # stays until every node trusts that CA (see the stanza after this
+        # one). A node trusts the re-issued certificate through the CA, so the
+        # re-issue needs no change to this file.
         #
         # Regenerated 2026-08-28 with a proper SAN: the original had none,
         # which Go's crypto/tls -- kairos-agent's TLS
@@ -449,6 +451,40 @@ stages:
             FO2BzwJWq93W0Fgx++QSwaqGIHfVH37X8ivmbqgCKMskdl7R6pFYHRYwaoVluGWZ
             vnRfLSNz8BSTaVrR1wDjid80YutIrD5gR9WIsv615vEXZTAoVKIcQW+ep+s8lK2v
             A1vyjlk=
+            -----END CERTIFICATE-----
+      commands:
+        - update-ca-certificates
+    - name: "Trust the apps.home.arpa CA"
+      files:
+        # Public CA certificate only. The CA key is not here.
+        #
+        # The fleet server's certificate is going to be re-issued from this CA.
+        # A node must trust the CA before that happens, or its registration
+        # fails TLS verification. The fleet stanza above stays until every
+        # node trusts the CA.
+        - path: /usr/local/share/ca-certificates/apps-home-arpa-ca.crt
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            -----BEGIN CERTIFICATE-----
+            MIIDGTCCAgGgAwIBAgIUDeCImbAiYDhfC2YDPJfrKpfn77wwDQYJKoZIhvcNAQEL
+            BQAwHDEaMBgGA1UEAwwRYXBwcy5ob21lLmFycGEtY2EwHhcNMjYwOTIxMTIyMDEw
+            WhcNMzYwOTE4MTIyMDEwWjAcMRowGAYDVQQDDBFhcHBzLmhvbWUuYXJwYS1jYTCC
+            ASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMS0wbd5wX7zwWG0Yk0fVXnu
+            IltI9i6iBR7xv8OHkWkThYhWN1MFwqAPUG73IkBtqyMdoQ0J2EDP2912kzbkR4cB
+            Kc52INFdBjk9fsSznzB9Z0Hk3FONPsOGAoGeRoYaUCsQ8eXabK3YmLgM7mNIDPug
+            KSIsLk+lYLHOJUywkH/49AHefxYGPCEDiDnIq8gIQRg8+Q2sWFYsTV8aq2bku9SV
+            0yA0zA2xMQGjgv212sjBl6CNkVClE3sXM8XTLwbwuOWj2IKe/WKq8nkyqHOITWcL
+            gYoNfYXn35JS5/LAjW3ymVqOIhx1EC7zI1cVLwtR1MTRz7fOHemTm1Ru5/BwywEC
+            AwEAAaNTMFEwHQYDVR0OBBYEFEUHXjbi+77C+AYPotRPaWPIspBvMB8GA1UdIwQY
+            MBaAFEUHXjbi+77C+AYPotRPaWPIspBvMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZI
+            hvcNAQELBQADggEBAEKe6EkCfG6baS57P0Ho5QFU5HbygIMRNCDJsBaunwfEakdb
+            VjG/BiH2aixC0IePaGj7e95x7DDP/1eYpG4+tmh0XBddp6bHE0CMvgWoJyP7EUBS
+            CrWjcfnne1TWcGTl9W1EF39DAo0oaXVzm6I2ornnIRzza/zltCVDFOo/WuoqwQnl
+            C9Do0CpmE5s5UycCUZ4GGXs6v6UcUDzNV6kgaC1RqFg8DTqNlocJLGSS2w5PRIih
+            lzxp1zEwm/0B2W0cuRDGZ4V8ILjwyENSjsABNCP12c8zCnJXwNvtXfaTE1PTU41A
+            5ZXjr9geQfdKe4JNXdKiECV6N5HhfhdSELCyMKc=
             -----END CERTIFICATE-----
       commands:
         - update-ca-certificates
