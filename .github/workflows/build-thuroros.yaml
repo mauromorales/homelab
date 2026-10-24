@@ -9,12 +9,14 @@ on:
       - 'nodes/thuroros/Dockerfile'
       - 'nodes/thuroros/kairos.Dockerfile'
       - 'nodes/thuroros/cloud-config.yaml'
+      - 'nodes/thuroros/system-oem/**'
       - '.github/workflows/build-thuroros.yaml'
   pull_request:
     paths:
       - 'nodes/thuroros/Dockerfile'
       - 'nodes/thuroros/kairos.Dockerfile'
       - 'nodes/thuroros/cloud-config.yaml'
+      - 'nodes/thuroros/system-oem/**'
       - '.github/workflows/build-thuroros.yaml'
 
 permissions:
