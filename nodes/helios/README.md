@@ -25,6 +25,12 @@ containerd at the hook. The toolkit version must match the one the device plugin
 version is the build argument `NVIDIA_CTK_VERSION`. `test-image.sh` checks that both binaries exist and
 that `nvidia-cdi-hook --version` reports that version.
 
+**Two links.** `/usr/sbin/ldconfig` points to `/usr/bin/ldconfig`: the CDI hook opens `/sbin/ldconfig`
+(`/sbin` is `usr/sbin`) to rebuild the library cache in a GPU container. `/usr/lib64/libnvidia-ml.so.1`
+points to the driver library in `/usr/libc/lib`: the device plugin looks for NVML only in the standard
+lib folders under its driver root. `test-image.sh` checks both links, and that `/usr/sbin` is still the base
+image's real directory (a replaced one hides `modprobe` and breaks the CNI).
+
 The `Dockerfile` is adapted from the
 [`examples/add-packages/Dockerfile.nvidia`](https://github.com/kairos-io/hadron/blob/ce78a7c/examples/add-packages/Dockerfile.nvidia)
 example in kairos-io/hadron (commit `ce78a7c`). Changes from that example:
@@ -71,6 +77,6 @@ version of the Hadron image, because the modules must match that kernel.
 
 ## Not in this image
 
-- The NVIDIA container toolkit. Pods cannot use the GPU with this image alone.
+- The Kubernetes device plugin. The image has the toolkit hook, but a pod needs the plugin to ask for the GPU (see the private hegemonikon repository).
 - Secure Boot signing. The modules are unsigned, so use a GRUB install, not a UKI with
   Secure Boot.

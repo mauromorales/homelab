@@ -222,8 +222,9 @@ RUN echo "blacklist nouveau" > ${OUTPUT}/etc/modprobe.d/blacklist-nouveau.conf
 # without it the hook fails with "stat /sbin/ldconfig: no such file or directory"
 # and GPU pods cannot start.
 #
-# On Hadron the layout is:  /sbin -> usr/bin   AND   /usr/sbin -> bin
-# Both /sbin/ldconfig and /usr/sbin/ldconfig therefore resolve to /usr/bin/ldconfig.
+# On Hadron the layout is:  /sbin -> usr/sbin   AND   /bin -> usr/bin, and /usr/sbin
+# is a real directory (seen on a running node). It holds no ldconfig, so the
+# hadron-extension stage below links /usr/sbin/ldconfig to /usr/bin/ldconfig.
 #
 # CRITICAL: do NOT create ${OUTPUT}/usr/sbin/ in this stage. Because we COPY this
 # stage with `--link`, BuildKit overlays the directory entry — and a real directory
@@ -253,6 +254,15 @@ COPY --from=nvidia-builder /output/ /
 FROM ${BASE_IMAGE}:${BASE_IMAGE_TAG} AS hadron-extension
 COPY --link --from=modules-builder /output/ /usr/
 COPY --link --from=nvidia-builder /output/ /
+# Two links the GPU needs on Hadron. A RUN link goes into the existing /usr/sbin; it
+# does not replace the directory (see the warning above).
+# - /usr/sbin/ldconfig: the CDI hook opens /sbin/ldconfig, which is /usr/sbin/ldconfig.
+# - /usr/lib64/libnvidia-ml.so.1: the device plugin looks for NVML only in the standard
+#   lib folders under its driver root. The driver libraries are in /usr/libc/lib. The
+#   link is relative so it still resolves when the plugin mounts the host root.
+RUN ln -s ../bin/ldconfig /usr/sbin/ldconfig && \
+    mkdir -p /usr/lib64 && \
+    ln -s ../libc/lib/libnvidia-ml.so.1 /usr/lib64/libnvidia-ml.so.1
 # Regenerate modules.dep with the full module tree (base kernel + nvidia).
 # The modules-builder depmod only saw nvidia modules, overwriting the base image's modules.dep.
 RUN depmod -a $(ls /usr/lib/modules/ | head -1)
