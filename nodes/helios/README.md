@@ -77,6 +77,6 @@ version of the Hadron image, because the modules must match that kernel.
 
 ## Not in this image
 
-- The Kubernetes device plugin. The image has the toolkit hook, but a pod needs the plugin to ask for the GPU (see the private hegemonikon repository).
+- The Kubernetes device plugin. The image has the toolkit hook, but a pod needs the plugin to ask for the GPU.
 - Secure Boot signing. The modules are unsigned, so use a GRUB install, not a UKI with
   Secure Boot.

@@ -9,7 +9,7 @@ image="${1:?usage: test-image.sh <image> [module-version [userspace-version]]}"
 want="${2:-595.91.07}"
 want_user="${3:-$want}"
 
-work="$(mktemp -d "${TMPDIR:-/var/tmp}/test-image.XXXXXX")"
+work="$(cd "$(mktemp -d "${TMPDIR:-/var/tmp}/test-image.XXXXXX")" && pwd -P)"
 cid=""
 cleanup() {
   [ -n "$cid" ] && docker rm -f "$cid" >/dev/null 2>&1 || true
