@@ -10,11 +10,14 @@ name: "helios nvidia runtime for containerd"
 # sets NVIDIA_VISIBLE_DEVICES=all) it builds a CDI spec on the spot and hands it to runc. The legacy
 # mode would need the prestart hook and libnvidia-container, which this image does not ship. The
 # runtime must be told where runc is, because k0s keeps it in /var/lib/k0s/bin, outside the PATH.
+# The path is the default k0s data directory; a node with another --data-dir needs another path.
 stages:
   initramfs:
     - name: "Add the nvidia runtime handler to the k0s containerd config"
       directories:
         - path: /etc/k0s/containerd.d
+          permissions: 0755
+        - path: /etc/nvidia-container-runtime
           permissions: 0755
       files:
         - path: /etc/nvidia-container-runtime/config.toml

@@ -29,7 +29,9 @@ that `nvidia-cdi-hook --version` reports that version.
 package) and a containerd drop-in, `/etc/k0s/containerd.d/nvidia.toml`, written from
 `nvidia-runtime-oem.yaml`. It adds a runtime handler `nvidia`. The device plugin pod runs with
 `runtimeClassName: nvidia`, so the runtime gives it the GPU device nodes and the driver libraries and the
-pod needs no privileged mode. The runtime runs in `jit-cdi` mode (config written by the same file), so it needs no legacy hook or libnvidia-container, and it is told where k0s keeps `runc`. GPU pods use no runtime class; the plugin hands them the GPU through CDI.
+pod needs no privileged mode. The runtime runs in `jit-cdi` mode (config written by the same
+file), so it needs no legacy hook or libnvidia-container, and it is told where k0s keeps `runc`.
+GPU pods use no runtime class; the plugin hands them the GPU through CDI.
 
 **Two links.** `/usr/sbin/ldconfig` points to `/usr/bin/ldconfig`: the CDI hook opens `/sbin/ldconfig`
 (`/sbin` is `usr/sbin`) to rebuild the library cache in a GPU container. `/usr/lib64/libnvidia-ml.so.1`

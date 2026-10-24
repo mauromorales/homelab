@@ -129,12 +129,11 @@ case "$rtver" in
   *) miss "nvidia-container-runtime did not report $want_ctk (got: ${rtver:-nothing})" ;;
 esac
 rtoem="$work/system/oem/60_helios_nvidia_runtime.yaml"
-if [ -f "$rtoem" ] && grep -q 'BinaryName = "/usr/bin/nvidia-container-runtime"' "$rtoem" && grep -q 'version = 3' "$rtoem" \
-   && grep -q 'containerd.runtimes.nvidia\]' "$rtoem" \
-   && grep -q 'mode = "jit-cdi"' "$rtoem" && grep -q 'runtimes = \["/var/lib/k0s/bin/runc"\]' "$rtoem"; then
-  pass "the containerd nvidia handler config is in the image"
+if cmp -s "$rtoem" "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/nvidia-runtime-oem.yaml" \
+   && grep -q 'mode = "jit-cdi"' "$rtoem" && grep -q 'BinaryName = "/usr/bin/nvidia-container-runtime"' "$rtoem"; then
+  pass "the containerd nvidia handler config in the image matches nvidia-runtime-oem.yaml"
 else
-  miss "the containerd nvidia handler config is missing or wrong"
+  miss "the containerd nvidia handler config is missing or differs from nvidia-runtime-oem.yaml"
 fi
 
 # 3b3. Two links the GPU needs on Hadron. The CDI hook opens /sbin/ldconfig (/sbin is usr/sbin),
