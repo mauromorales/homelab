@@ -130,7 +130,8 @@ case "$rtver" in
 esac
 rtoem="$work/system/oem/60_helios_nvidia_runtime.yaml"
 if [ -f "$rtoem" ] && grep -q 'BinaryName = "/usr/bin/nvidia-container-runtime"' "$rtoem" && grep -q 'version = 3' "$rtoem" \
-   && grep -q 'containerd.runtimes.nvidia\]' "$rtoem"; then
+   && grep -q 'containerd.runtimes.nvidia\]' "$rtoem" \
+   && grep -q 'mode = "jit-cdi"' "$rtoem" && grep -q 'runtimes = \["/var/lib/k0s/bin/runc"\]' "$rtoem"; then
   pass "the containerd nvidia handler config is in the image"
 else
   miss "the containerd nvidia handler config is missing or wrong"
