@@ -18,6 +18,13 @@ key. To log in, boot it with your own cloud-config, for example the config of an
 image. Create a user other than `kairos`: the image keeps `kairos` locked, and it locks it again after
 your config ran. It does nothing on an installed system or in recovery.
 
+**Container toolkit.** The image carries `nvidia-ctk` and `nvidia-cdi-hook` (NVIDIA container toolkit
+1.20.1, the `nvidia-container-toolkit-base` package, checked against the pinned sha256 of the release
+archive) in `/usr/bin`. A Kubernetes device plugin writes the CDI spec at run time and points
+containerd at the hook. The toolkit version must match the one the device plugin chart bundles. The
+version is the build argument `NVIDIA_CTK_VERSION`. `test-image.sh` checks that both binaries exist and
+that `nvidia-cdi-hook --version` reports that version.
+
 The `Dockerfile` is adapted from the
 [`examples/add-packages/Dockerfile.nvidia`](https://github.com/kairos-io/hadron/blob/ce78a7c/examples/add-packages/Dockerfile.nvidia)
 example in kairos-io/hadron (commit `ce78a7c`). Changes from that example:
