@@ -183,7 +183,8 @@ stages:
           group: 0
           content: |
             #!/usr/bin/env python3
-            """Tiny config UI for the doorbell, served at http://thuroros.local:8080/doorbell
+            """Tiny config UI for the doorbell, served on :8080 at /doorbell and
+            fronted by nginx on 443, where / redirects to /doorbell.
 
             Lets you pick who gets notified (admin/family), change the message text,
             and set the MQTT broker credential, all without redeploying. Writes the
@@ -413,6 +414,86 @@ stages:
       commands:
         - ln -sf /etc/systemd/system/doorbell.service /etc/systemd/system/multi-user.target.wants/doorbell.service
         - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
+    - name: "Generate a self-signed certificate for doorbell.home.arpa"
+      commands:
+        # Server cert for this node's own nginx, not a cert this node trusts
+        # (that's the fleet.home.arpa stage below). The key never leaves the
+        # Pi and is never committed here -- generated once, on first boot,
+        # into /usr/local/doorbell/tls, on the COS_PERSISTENT partition, so it
+        # survives reboots and upgrades. (/etc is a tmpfs overlay, and only
+        # /etc/ssl/certs among the ssl paths is persisted, not /etc/ssl/private.)
+        # A rebuild or a re-flash makes a new one.
+        #
+        # Whoever wants other machines to stop warning about this cert reads
+        # it back off the Pi (/usr/local/doorbell/tls/doorbell.home.arpa.crt) and adds
+        # it to those machines' trust stores by hand, the same one-time step
+        # already done for fleet.home.arpa in this file.
+        - |
+          TLS=/usr/local/doorbell/tls
+          if [ ! -f $TLS/doorbell.home.arpa.crt ] || [ ! -f $TLS/doorbell.home.arpa.key ]; then
+            (
+              umask 077
+              mkdir -p $TLS
+              openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+                -keyout $TLS/doorbell.home.arpa.key \
+                -out $TLS/doorbell.home.arpa.crt \
+                -subj "/CN=doorbell.home.arpa" \
+                -addext "subjectAltName=DNS:doorbell.home.arpa"
+            )
+            chmod 644 $TLS/doorbell.home.arpa.crt
+          fi
+    - name: "Add the doorbell reverse proxy"
+      files:
+        - path: /etc/nginx/sites-available/doorbell.conf
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            # doorbell-web listens on :8080 and answers only on /doorbell. This
+            # proxy puts it at / on 443 over HTTPS, so the node is reachable by
+            # a plain hostname with no port and no path to remember. HTTPS here
+            # protects that route only: doorbell-web still binds 0.0.0.0:8080,
+            # so the page stays reachable over plain HTTP on that port.
+            #
+            # server_name is "_" on purpose. The name this node answers to is a
+            # DNS record that lives outside this repository, and it has changed
+            # before. Matching any name means a rename needs no image rebuild.
+            server {
+                listen 80 default_server;
+                listen [::]:80 default_server;
+                server_name _;
+
+                return 301 https://$host$request_uri;
+            }
+
+            server {
+                listen 443 ssl default_server;
+                listen [::]:443 ssl default_server;
+                server_name _;
+
+                ssl_certificate     /usr/local/doorbell/tls/doorbell.home.arpa.crt;
+                ssl_certificate_key /usr/local/doorbell/tls/doorbell.home.arpa.key;
+
+                # doorbell-web returns 404 for /, so send the bare hostname to the
+                # page that does exist rather than showing an error.
+                location = / {
+                    return 302 /doorbell;
+                }
+
+                location / {
+                    proxy_pass http://127.0.0.1:8080;
+                    proxy_set_header Host $host;
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+    - name: "Enable the doorbell reverse proxy"
+      commands:
+        # Ubuntu's nginx package ships a default site that also claims port 80.
+        - rm -f /etc/nginx/sites-enabled/default
+        - ln -sf /etc/nginx/sites-available/doorbell.conf /etc/nginx/sites-enabled/doorbell.conf
+        - ln -sf /lib/systemd/system/nginx.service /etc/systemd/system/multi-user.target.wants/nginx.service
     - name: "Trust fleet.home.arpa's certificate"
       files:
         # Public cert only, self-signed today. Re-issuing this from an
@@ -452,3 +533,29 @@ stages:
             -----END CERTIFICATE-----
       commands:
         - update-ca-certificates
+    - name: "Configure a static IP for eth0"
+      files:
+        # Matches the DHCP reservation already bound to this Pi's MAC on the
+        # Deco mesh. This is a second, independent guarantee of the same
+        # address, not a change to it -- if the two ever disagree, that is
+        # worth noticing, not something this file should paper over.
+        - path: /etc/netplan/99-thuroros-static.yaml
+          permissions: 0600
+          owner: 0
+          group: 0
+          content: |
+            network:
+              version: 2
+              renderer: networkd
+              ethernets:
+                eth0:
+                  dhcp4: false
+                  addresses:
+                    - 192.168.68.51/22
+                  routes:
+                    - to: default
+                      via: 192.168.68.1
+                  nameservers:
+                    addresses:
+                      - 192.168.68.59
+                      - 1.1.1.1
