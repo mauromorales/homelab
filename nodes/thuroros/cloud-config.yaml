@@ -415,9 +415,9 @@ stages:
         - ln -sf /etc/systemd/system/doorbell-web.service /etc/systemd/system/multi-user.target.wants/doorbell-web.service
     - name: "Trust fleet.home.arpa's certificate"
       files:
-        # Public cert only, self-signed today. Re-issuing this from an
-        # internal CA later is a content swap in this same file -- no change
-        # to how it's trusted.
+        # Public cert only. The fleet console used this self-signed cert until
+        # 2026-10-26, and now serves one from the internal CA-2 (second file
+        # below).
         #
         # Regenerated 2026-08-28 with a proper SAN: the original had none,
         # which Go's crypto/tls -- kairos-agent's TLS
@@ -449,6 +449,25 @@ stages:
             FO2BzwJWq93W0Fgx++QSwaqGIHfVH37X8ivmbqgCKMskdl7R6pFYHRYwaoVluGWZ
             vnRfLSNz8BSTaVrR1wDjid80YutIrD5gR9WIsv615vEXZTAoVKIcQW+ep+s8lK2v
             A1vyjlk=
+            -----END CERTIFICATE-----
+        # The fleet console certificate comes from the internal CA-2 since
+        # 2026-10-26, so the node must trust CA-2 as well. The self-signed
+        # file above stays, for a rollback.
+        - path: /usr/local/share/ca-certificates/apps-home-arpa-ca-2.crt
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            -----BEGIN CERTIFICATE-----
+            MIIBojCCAUegAwIBAgIUXk6O0RUfU5ZidRo0a23MITtsEYQwCgYIKoZIzj0EAwIw
+            HjEcMBoGA1UEAwwTYXBwcy5ob21lLmFycGEtY2EtMjAeFw0yNjEwMjUxMzM4MTha
+            Fw0zNjEwMjIxMzM4MThaMB4xHDAaBgNVBAMME2FwcHMuaG9tZS5hcnBhLWNhLTIw
+            WTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQyzfL3fhaluoSf65aNOtbG9MNBcUqL
+            Q6oJmNFKduB+1t34dXcmmFjATMTx1oxrJNTmhcBOEQ3fU7ysYCyIVGKHo2MwYTAf
+            BgNVHSMEGDAWgBTA9LECzAP/M6ZCJxVoTTO/RlEwFTAPBgNVHRMBAf8EBTADAQH/
+            MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUwPSxAswD/zOmQicVaE0zv0ZRMBUw
+            CgYIKoZIzj0EAwIDSQAwRgIhAIcJwa6vSFQIqlMVYGb5B0ZfLil1SJlsTVVif/iD
+            +3PtAiEAhfwza9R3+t0ucx+gGxW2+HBdU5+FdncjAiIRuIe79sk=
             -----END CERTIFICATE-----
       commands:
         - update-ca-certificates
