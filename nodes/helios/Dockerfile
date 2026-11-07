@@ -33,7 +33,15 @@ WORKDIR /build
 # Pull kernel sources so we can build the modules
 # cdn.kernel.org stores the tarballs under vMAJOR.x, so derive that from the version
 # instead of hardcoding it, and let curl fail on the download rather than on the untar
-RUN kver=$(cat /usr/share/kernel-misc/kernel-version) && curl -fL https://cdn.kernel.org/pub/linux/kernel/v${kver%%.*}.x/linux-${kver}.tar.xz -o linux-${kver}.tar.xz
+# Pinned checksum of the kernel source, from cdn.kernel.org sha256sums.asc. A kernel version
+# with no pinned value fails the build, so a toolchain bump cannot skip the check.
+ARG KERNEL_SHA256_VERSION=7.1.3
+ARG KERNEL_SHA256=be41c068e88f5242a19bccdbffbe077b18c47b45f627e2325504b4fab79dd1dc
+RUN kver=$(cat /usr/share/kernel-misc/kernel-version) && curl -fL https://cdn.kernel.org/pub/linux/kernel/v${kver%%.*}.x/linux-${kver}.tar.xz -o linux-${kver}.tar.xz && \
+    if [ "$kver" != "$KERNEL_SHA256_VERSION" ]; then \
+      echo "No pinned sha256 for kernel ${kver}. Update KERNEL_SHA256_VERSION and KERNEL_SHA256." >&2; exit 1; \
+    fi && \
+    echo "${KERNEL_SHA256}  linux-${kver}.tar.xz" | sha256sum -c -
 RUN kver=$(cat /usr/share/kernel-misc/kernel-version) && tar -xf linux-${kver}.tar.xz && mv linux-${kver} linux
 WORKDIR /build/linux
 RUN cp /usr/share/kernel-misc/kernel-config .config
@@ -45,7 +53,14 @@ RUN ARCH=${KERNEL_ARCH} make -s -j${JOBS} modules_prepare
 RUN cp /usr/share/kernel-misc/Module.symvers .
 ARG NVIDIA_VERSION
 WORKDIR /build
-RUN curl -fL https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/${NVIDIA_VERSION}.tar.gz --output nvidia.tar.gz
+# Pinned checksum of the module source tarball for one version. Another version fails the build.
+ARG NVIDIA_MODULES_SHA256_VERSION=595.91.07
+ARG NVIDIA_MODULES_SHA256=572220bd40b5592f2a6dab13e2137676d5e26cf6db95a9072131545067d35f24
+RUN curl -fL https://github.com/NVIDIA/open-gpu-kernel-modules/archive/refs/tags/${NVIDIA_VERSION}.tar.gz --output nvidia.tar.gz && \
+    if [ "$NVIDIA_VERSION" != "$NVIDIA_MODULES_SHA256_VERSION" ]; then \
+      echo "No pinned sha256 for module source ${NVIDIA_VERSION}. Update NVIDIA_MODULES_SHA256_VERSION and NVIDIA_MODULES_SHA256." >&2; exit 1; \
+    fi && \
+    echo "${NVIDIA_MODULES_SHA256}  nvidia.tar.gz" | sha256sum -c -
 RUN tar -xf nvidia.tar.gz && rm nvidia.tar.gz && mv open-gpu-kernel-modules-${NVIDIA_VERSION} nvidia-modules
 WORKDIR /build/nvidia-modules
 ENV CFLAGS="-Os -pipe"
