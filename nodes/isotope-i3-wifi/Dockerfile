@@ -7,6 +7,10 @@
 # Isotope pins, zstd-compressed like the rest of /usr/lib/firmware, and never
 # under /usr/local (an installed system mounts COS_PERSISTENT over it).
 #
+# It also replaces /usr/bin/start-desktop with a copy that gives Flatpak apps
+# the X cookie (Chromium from the first-run picker exits with "Authorization
+# required" without it).
+#
 # Temporary: once this is verified on hardware, the same fix goes upstream to
 # kairos-community/isotope and this node goes away.
 ARG BASE_IMAGE=ghcr.io/kairos-community/isotope:i3-v0.0.16
@@ -24,3 +28,4 @@ RUN base="https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmwar
 
 FROM ${BASE_IMAGE}
 COPY --from=fw /fw/ /
+COPY --chmod=755 start-desktop /usr/bin/start-desktop
