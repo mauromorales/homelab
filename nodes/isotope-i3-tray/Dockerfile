@@ -8,7 +8,7 @@
 # Temporary: both go upstream to kairos-community/isotope, and this node goes
 # away once a release carries them. /usr/bin, never /usr/local (an installed
 # system mounts COS_PERSISTENT over /usr/local).
-ARG BASE_IMAGE=ghcr.io/kairos-community/isotope:i3-v0.0.18
+ARG BASE_IMAGE=ghcr.io/kairos-community/isotope:i3-v0.0.17
 
 FROM golang:1.25.0-alpine3.22 AS update-build
 WORKDIR /src

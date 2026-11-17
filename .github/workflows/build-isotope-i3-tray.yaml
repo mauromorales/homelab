@@ -6,7 +6,7 @@ on:
       isotope_version:
         description: 'Isotope release the image is built on'
         required: false
-        default: 'v0.0.18'
+        default: 'v0.0.17'
         type: string
       label:
         description: 'What differs, used in the tag: <release>-<label>'
@@ -23,7 +23,8 @@ permissions:
 
 env:
   IMAGE_REPO: quay.io/mauromorales/isotope
-  # Pinned: the tray fix (branch isotope-strip-ansi-tray-v0.0.18 on the
+  # Base is v0.0.17 because the v0.0.18 image is not published yet; the two differ
+  # only by a Hadron bump, so update/ is the same. Pinned: the tray fix (branch isotope-strip-ansi-tray-v0.0.18 on the
   # mauro-agent fork) and Isotope main, for the Flatpak launcher.
   TRAY_REPO: mauro-agent/isotope
   TRAY_SHA: 36865443a950ca2e586638ecb365faf9aaa7f9f7
@@ -59,7 +60,7 @@ jobs:
 
       - name: Choose the tag, and refuse one that exists
         run: |
-          tag="${{ inputs.isotope_version || 'v0.0.18' }}-${{ inputs.label || 'tray' }}"
+          tag="${{ inputs.isotope_version || 'v0.0.17' }}-${{ inputs.label || 'tray' }}"
           if docker manifest inspect "${IMAGE_REPO}:${tag}" >/dev/null 2>&1; then
             echo "::error::${IMAGE_REPO}:${tag} already exists; pick another label"
             exit 1
@@ -71,7 +72,7 @@ jobs:
           cp -r tray-src/update nodes/isotope-i3-tray/update
           cp main-src/rootfs-i3/usr/bin/start-desktop nodes/isotope-i3-tray/start-desktop
           docker build \
-            --build-arg BASE_IMAGE="ghcr.io/kairos-community/isotope:i3-${{ inputs.isotope_version || 'v0.0.18' }}" \
+            --build-arg BASE_IMAGE="ghcr.io/kairos-community/isotope:i3-${{ inputs.isotope_version || 'v0.0.17' }}" \
             -t isotope-i3-tray:dev nodes/isotope-i3-tray
 
       - name: Check the launcher fix is in the image
