@@ -16,6 +16,9 @@ on:
 permissions:
   contents: read
 
+env:
+  IMAGE_REPO: quay.io/mauromorales/isotope
+
 jobs:
   iso:
     runs-on: ubuntu-24.04
@@ -50,6 +53,24 @@ jobs:
         run: |
           docker run --rm --entrypoint ls isotope-i3-wifi:dev \
             /usr/lib/firmware/brcm/bcm43xx-0.fw.zst /usr/lib/firmware/brcm/bcm43xx_hdr-0.fw.zst
+
+      # The image is pushed so a machine already running Isotope can take it with
+      # `isotope upgrade`, without writing a USB stick. Tags: i3-wifi-<release>
+      # moves with each build; i3-wifi-<release>-<sha> never moves.
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Push the image
+        run: |
+          v="${{ inputs.isotope_version || 'v0.0.16' }}"
+          for tag in "i3-wifi-${v}" "i3-wifi-${v}-${GITHUB_SHA::7}"; do
+            docker tag isotope-i3-wifi:dev "${IMAGE_REPO}:${tag}"
+            docker push "${IMAGE_REPO}:${tag}"
+          done
 
       - name: Build the ISO
         working-directory: isotope
