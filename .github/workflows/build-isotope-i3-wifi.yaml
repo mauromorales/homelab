@@ -1,0 +1,54 @@
+name: 'Build Isotope i3 Wi-Fi ISO'
+
+on:
+  workflow_dispatch:
+    inputs:
+      isotope_version:
+        description: 'Isotope release tag to build on'
+        required: false
+        default: 'v0.0.16'
+        type: string
+  pull_request:
+    paths:
+      - 'nodes/isotope-i3-wifi/**'
+      - '.github/workflows/build-isotope-i3-wifi.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  iso:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Checkout Isotope (for its ISO build script and theme)
+        uses: actions/checkout@v6
+        with:
+          repository: kairos-community/isotope
+          ref: ${{ inputs.isotope_version || 'v0.0.16' }}
+          path: isotope
+
+      - name: Build the image
+        run: |
+          v="${{ inputs.isotope_version || 'v0.0.16' }}"
+          docker build \
+            --build-arg BASE_IMAGE="ghcr.io/kairos-community/isotope:i3-${v}" \
+            -t isotope-i3-wifi:dev nodes/isotope-i3-wifi
+
+      - name: Check the firmware is in the image
+        run: |
+          docker run --rm --entrypoint ls isotope-i3-wifi:dev \
+            /usr/lib/firmware/brcm/bcm43xx-0.fw.zst /usr/lib/firmware/brcm/bcm43xx_hdr-0.fw.zst
+
+      - name: Build the ISO
+        working-directory: isotope
+        run: auroraboot/build.sh isotope-i3-wifi:dev "$PWD/../iso-out"
+
+      - name: Upload the ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: isotope-i3-wifi-iso
+          path: iso-out/*.iso
+          retention-days: 14
