@@ -30,6 +30,15 @@ jobs:
           ref: ${{ inputs.isotope_version || 'v0.0.16' }}
           path: isotope
 
+      # The image copy, the squashfs and the ISO each take several GB, more than
+      # a stock runner has free. Same cleanup Isotope's own release build does.
+      - name: Reclaim runner disk space
+        run: |
+          sudo rm -rf /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup \
+            /usr/local/lib/android /usr/share/dotnet
+          docker system prune --all --force
+          df -h /
+
       - name: Build the image
         run: |
           v="${{ inputs.isotope_version || 'v0.0.16' }}"
@@ -44,7 +53,9 @@ jobs:
 
       - name: Build the ISO
         working-directory: isotope
-        run: auroraboot/build.sh isotope-i3-wifi:dev "$PWD/../iso-out"
+        run: |
+          df -h /
+          auroraboot/build.sh isotope-i3-wifi:dev "$PWD/../iso-out" || { df -h /; exit 1; }
 
       - name: Upload the ISO
         uses: actions/upload-artifact@v4
