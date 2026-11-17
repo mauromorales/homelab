@@ -55,11 +55,11 @@ jobs:
         working-directory: isotope
         run: |
           df -h /
-          auroraboot/build.sh isotope-i3-wifi:dev "$PWD/../iso-out" || { df -h /; exit 1; }
+          auroraboot/build.sh isotope-i3-wifi:dev build/iso-out || { df -h /; exit 1; }
 
       - name: Upload the ISO
         uses: actions/upload-artifact@v4
         with:
           name: isotope-i3-wifi-iso
-          path: iso-out/*.iso
+          path: isotope/build/iso-out/*.iso
           retention-days: 14
