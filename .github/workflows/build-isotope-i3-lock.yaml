@@ -11,7 +11,7 @@ on:
       label:
         description: 'What differs, used in the tag: <release>-<label>'
         required: false
-        default: 'lock'
+        default: 'lock-scaled'
         type: string
   pull_request:
     paths:
@@ -26,7 +26,7 @@ env:
   # Pinned: the i3lock change (branch isotope-i3lock-indicator on the
   # mauro-agent fork).
   LOCK_REPO: mauro-agent/isotope
-  LOCK_SHA: f0baaa7199e54fbeccfaa48ab7441b29540d645d
+  LOCK_SHA: 90834f607ea5f4c6ea81035befefafd720ac0beb
 
 jobs:
   image:
@@ -58,7 +58,7 @@ jobs:
 
       - name: Choose the tag, and refuse one that exists
         run: |
-          tag="${{ inputs.isotope_version || 'v0.0.22' }}-${{ inputs.label || 'lock' }}"
+          tag="${{ inputs.isotope_version || 'v0.0.22' }}-${{ inputs.label || 'lock-scaled' }}"
           if docker manifest inspect "${IMAGE_REPO}:${tag}" >/dev/null 2>&1; then
             echo "::error::${IMAGE_REPO}:${tag} already exists; pick another label"
             exit 1

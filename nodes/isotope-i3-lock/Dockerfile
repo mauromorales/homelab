@@ -1,8 +1,9 @@
 # Isotope i3 with a changed screen lock, layered on a release for testing.
 #
 # i3lock is rebuilt by Isotope's own `i3lock` build stage, from the fork commit
-# the workflow pins (it draws the unlock ring from the start, at a size for
-# small screens). The workflow builds that stage into the local image
+# the workflow pins (it draws the unlock ring from the start and sizes it by
+# screen height, like the splash). The workflow builds that stage into the local
+# image
 # i3lock-stage:dev and this file copies its output over the release's i3lock.
 # The PAM file and the i3 config are untouched.
 #
