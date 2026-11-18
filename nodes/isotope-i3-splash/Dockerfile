@@ -3,9 +3,10 @@
 # The splash is built from the splash/ directory the workflow copies in, with
 # the same Hadron toolchain image Isotope builds it with, so it links against
 # the same libc as the image it lands in. It goes to /usr/bin/kairos-splash,
-# which kairos-splash.service runs before the login screen. The copy inside the
-# initramfs is baked at install time and is NOT replaced by this layer, so the
-# change shows only on that service's run, not during early boot.
+# which kairos-splash.service runs before the login screen, and the initramfs
+# is regenerated so the copy that draws the disk passphrase screen is the new
+# one too. Checked on v0.0.22: the regenerated initrd has the same file list as
+# the shipped one, and its kairos-splash is the new binary.
 #
 # Temporary: the change goes upstream to kairos-community/isotope, and this node
 # goes away once a release carries it.
@@ -21,3 +22,6 @@ RUN cd /build/splash && make clean && make && make test && \
 
 FROM ${BASE_IMAGE}
 COPY --from=splash-build /build/splash/isotope-splash /usr/bin/kairos-splash
+
+# dracut finds the splash through the 50kairos-splash module already in the image.
+RUN dracut -f /boot/initrd "$(cat /boot/kernel-release)"
