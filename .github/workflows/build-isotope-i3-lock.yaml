@@ -1,0 +1,93 @@
+name: 'Build Isotope i3 lock test image'
+
+on:
+  workflow_dispatch:
+    inputs:
+      isotope_version:
+        description: 'Isotope release the image is built on'
+        required: false
+        default: 'v0.0.22'
+        type: string
+      label:
+        description: 'What differs, used in the tag: <release>-<label>'
+        required: false
+        default: 'lock'
+        type: string
+  pull_request:
+    paths:
+      - 'nodes/isotope-i3-lock/**'
+      - '.github/workflows/build-isotope-i3-lock.yaml'
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_REPO: quay.io/mauromorales/isotope
+  # Pinned: the i3lock change (branch isotope-i3lock-indicator on the
+  # mauro-agent fork).
+  LOCK_REPO: mauro-agent/isotope
+  LOCK_SHA: f0baaa7199e54fbeccfaa48ab7441b29540d645d
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Checkout the i3lock change
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.LOCK_REPO }}
+          ref: ${{ env.LOCK_SHA }}
+          path: lock-src
+
+      - name: Reclaim runner disk space
+        run: |
+          sudo rm -rf /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup \
+            /usr/local/lib/android /usr/share/dotnet
+          docker system prune --all --force
+          df -h /
+
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Choose the tag, and refuse one that exists
+        run: |
+          tag="${{ inputs.isotope_version || 'v0.0.22' }}-${{ inputs.label || 'lock' }}"
+          if docker manifest inspect "${IMAGE_REPO}:${tag}" >/dev/null 2>&1; then
+            echo "::error::${IMAGE_REPO}:${tag} already exists; pick another label"
+            exit 1
+          fi
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+
+      # Builds i3lock and every library it needs from source, as Isotope does.
+      - name: Build Isotope's i3lock stage
+        run: docker build --target i3lock -t i3lock-stage:dev lock-src
+
+      - name: Build the image
+        run: |
+          docker build \
+            --build-arg BASE_IMAGE="ghcr.io/kairos-community/isotope:i3-${{ inputs.isotope_version || 'v0.0.22' }}" \
+            -t isotope-i3-lock:dev nodes/isotope-i3-lock
+
+      - name: Check the new i3lock is in the image
+        run: |
+          docker run --rm --entrypoint sh isotope-i3-lock:dev -c 'i3lock --version && ls -l /usr/bin/i3lock'
+
+      - name: Push the image
+        run: |
+          docker tag isotope-i3-lock:dev "${IMAGE_REPO}:${TAG}"
+          docker push "${IMAGE_REPO}:${TAG}"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE_REPO}:${TAG}")
+          {
+            echo "Pushed \`${IMAGE_REPO}:${TAG}\`"
+            echo
+            echo "Digest: \`${digest}\`"
+            echo
+            echo "Upgrade: \`isotope upgrade --image ${IMAGE_REPO}:${TAG}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
