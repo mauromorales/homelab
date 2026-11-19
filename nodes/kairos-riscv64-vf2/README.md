@@ -23,18 +23,17 @@ Tested on 2026-11-19, on a board with no fan or heatsink (55-70 C).
 
 Not tested: TPM, k0s, NVMe on the final build, boot time.
 
-## Images
+## Image
 
-| Dockerfile | Kernel | HDMI |
-|---|---|---|
-| [`kairos.Dockerfile`](./kairos.Dockerfile) | Ubuntu 7.0 | no |
-| [`Dockerfile.hdmi`](./Dockerfile.hdmi) | 7.4-rc1 + JH7110 display series | yes |
-
-The stock image is published to `quay.io/mauromorales/kairos-riscv64-vf2` by
+[`Dockerfile`](./Dockerfile) builds one image: Kairos v4.4.0 with a patched
+7.4-rc1 kernel that has the HDMI driver. The kernel is built inside the Docker
+build (cross-compiled, not under QEMU). Published to
+`quay.io/mauromorales/kairos-riscv64-vf2` by
 [`build-kairos-riscv64-vf2.yaml`](../../.github/workflows/build-kairos-riscv64-vf2.yaml).
-The HDMI image is not built in CI yet: the kernel build is a manual step.
+For the stock Ubuntu kernel without HDMI, use the generic image in
+[`../kairos-riscv64`](../kairos-riscv64), or build your own with `kairos-init`.
 
-Both use the riscv64 tools from the Kairos v4.4.0 release, and the k3s fork from
+It uses the riscv64 tools from the Kairos v4.4.0 release, and the k3s fork from
 [CARV-ICS-FORTH](https://github.com/CARV-ICS-FORTH/k3s), because k3s has no official
 riscv64 release ([k3s-io/k3s#7151](https://github.com/k3s-io/k3s/issues/7151)).
 Put your own SSH key into [`cloud-config.yaml`](./cloud-config.yaml); there is no
@@ -51,7 +50,7 @@ default password.
    monitor shows "no signal". The HDMI image uses mainline v7.4-rc1 plus the unmerged
    display series from
    [Opvolger/linux-drm-jh7110](https://github.com/Opvolger/linux-drm-jh7110)
-   (patches 0001-0024). Build it with [`kernel/build.sh`](./kernel/build.sh).
+   (patches 0001-0024). The config is [`kernel/config`](./kernel/config).
    Kairos does not yet load the board's device tree by itself: at the GRUB
    prompt, type the entry from [`kernel/grubmenu`](./kernel/grubmenu). The
    `/oem/grubmenu` hook did not show the entry in the menu on this board.

@@ -1,4 +1,0 @@
-FROM ubuntu:24.04
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential gcc-riscv64-linux-gnu bc bison flex libssl-dev libelf-dev libncurses-dev dwarves rsync kmod cpio xz-utils zstd python3 perl u-boot-tools device-tree-compiler git ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN apt-get update && apt-get install -y --no-install-recommends gawk && rm -rf /var/lib/apt/lists/*
