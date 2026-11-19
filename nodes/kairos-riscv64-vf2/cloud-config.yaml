@@ -17,3 +17,59 @@ k3s:
     # The root filesystem is an overlay; containerd's overlayfs snapshotter
     # cannot stack on it. See ../kairos-riscv64/README.md.
     - --snapshotter=native
+
+# Trust the fleet console, same as the other nodes. Without it the
+# phone-home registration fails TLS verification. Public certificates only.
+# The registration token is NOT here: it is a secret, see README.md (Fleet).
+stages:
+  initramfs:
+    - name: "Trust the fleet console's certificate"
+      files:
+        # Public cert only: the fleet console's own certificate. It also needs a
+        # SAN: Go's crypto/tls (kairos-agent) rejects a cert with only a CN.
+        - path: /usr/local/share/ca-certificates/fleet-console.crt
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            -----BEGIN CERTIFICATE-----
+            MIIDMTCCAhmgAwIBAgIUOIrQDxfxWCgsNzr1d1Liw8tUPVcwDQYJKoZIhvcNAQEL
+            BQAwGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMB4XDTI2MDgyODE0MzYyOVoX
+            DTM2MDgyNTE0MzYyOVowGjEYMBYGA1UEAwwPZmxlZXQuaG9tZS5hcnBhMIIBIjAN
+            BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwp+7/6QeXTCbk4wUG7DiGjMJagDS
+            vyfO6aleqNLA/Rt/fVXIm555V49XotMWaAm09xMjGnYnb/ZFVBt2cnGzKbsTqDxi
+            /9EvK2kwxMvfkriIr10W/O1drDxAWrYA+BF5HhqpS46Zx8CLbGbfMVRXmGW0Q5jL
+            j7aT8U7bqJwcWH0lDiC6g0vMLgpwhFU2zvUwR+B8tqqReunzmMK5OJ7m7MUrKmqH
+            ucqucR8gZgJo8o9n1MG7Z3etvhXLAWON4HEGfIT96LUci+L2cVgGEoQAiZxkORCG
+            vF662gKm/Sm12YqR1Tt3KLYh/Vkx5VBe/TtHqq6FdkhkKY7YQG9JT2XM7wIDAQAB
+            o28wbTAdBgNVHQ4EFgQUWESfqwpGzLa15btFHYgqjyYMenEwHwYDVR0jBBgwFoAU
+            WESfqwpGzLa15btFHYgqjyYMenEwDwYDVR0TAQH/BAUwAwEB/zAaBgNVHREEEzAR
+            gg9mbGVldC5ob21lLmFycGEwDQYJKoZIhvcNAQELBQADggEBAI7+JMbc3qDDyMBr
+            vco5529bwQzo+i8Ufq5GvroksJ0dpivQVInhdLQurBUd8nCe09vTPH72zjseCrgC
+            akBHtOwh2R4BnAC+mT2E+7wGmWwMiI6PMWBF72WoAbnkt+4DQk08tBauo9Sw0Hg9
+            XoWB3LhK9YTUy2HE3sLN7qWqaVr0hFI7B37gjGn+PJVc+P0dctBrdj19ys9oKdQX
+            FO2BzwJWq93W0Fgx++QSwaqGIHfVH37X8ivmbqgCKMskdl7R6pFYHRYwaoVluGWZ
+            vnRfLSNz8BSTaVrR1wDjid80YutIrD5gR9WIsv615vEXZTAoVKIcQW+ep+s8lK2v
+            A1vyjlk=
+            -----END CERTIFICATE-----
+        # The fleet console certificate comes from the internal CA-2 since
+        # 2026-10-26, so the node must trust CA-2 as well. The self-signed
+        # file above stays, for a rollback.
+        - path: /usr/local/share/ca-certificates/apps-home-arpa-ca-2.crt
+          permissions: 0644
+          owner: 0
+          group: 0
+          content: |
+            -----BEGIN CERTIFICATE-----
+            MIIBojCCAUegAwIBAgIUXk6O0RUfU5ZidRo0a23MITtsEYQwCgYIKoZIzj0EAwIw
+            HjEcMBoGA1UEAwwTYXBwcy5ob21lLmFycGEtY2EtMjAeFw0yNjEwMjUxMzM4MTha
+            Fw0zNjEwMjIxMzM4MThaMB4xHDAaBgNVBAMME2FwcHMuaG9tZS5hcnBhLWNhLTIw
+            WTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQyzfL3fhaluoSf65aNOtbG9MNBcUqL
+            Q6oJmNFKduB+1t34dXcmmFjATMTx1oxrJNTmhcBOEQ3fU7ysYCyIVGKHo2MwYTAf
+            BgNVHSMEGDAWgBTA9LECzAP/M6ZCJxVoTTO/RlEwFTAPBgNVHRMBAf8EBTADAQH/
+            MA4GA1UdDwEB/wQEAwIBBjAdBgNVHQ4EFgQUwPSxAswD/zOmQicVaE0zv0ZRMBUw
+            CgYIKoZIzj0EAwIDSQAwRgIhAIcJwa6vSFQIqlMVYGb5B0ZfLil1SJlsTVVif/iD
+            +3PtAiEAhfwza9R3+t0ucx+gGxW2+HBdU5+FdncjAiIRuIe79sk=
+            -----END CERTIFICATE-----
+      commands:
+        - update-ca-certificates

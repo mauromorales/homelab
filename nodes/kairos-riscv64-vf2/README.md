@@ -66,6 +66,21 @@ default password.
    did not cut the power to the board. The console on the serial port is 9600
    baud once the kernel boots (`console=ttyS0`), 115200 in U-Boot and GRUB.
 
+## Fleet
+
+[`cloud-config.yaml`](./cloud-config.yaml) trusts the fleet console's certificate and
+the internal CA-2, the same way `thuroros` does, so the node can register with the
+AuroraBoot fleet server. The registration token is a secret and is not in this repo.
+After the install, run the fleet server's command on the node as root:
+
+```
+curl -sfL https://<fleet-host>/api/v1/install-agent | \
+  AURORABOOT_URL=https://<fleet-host> REGISTRATION_TOKEN=<token> sh
+```
+
+The board registered and connected on 2026-11-19. The fleet server cannot build
+riscv64 images, so the node joins through this script, not through an artifact.
+
 ## Install
 
 1. Update U-Boot (limitation 1).
