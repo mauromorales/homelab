@@ -1,8 +1,8 @@
 name: 'Build Kairos riscv64 VisionFive 2 image'
 
-# Builds nodes/kairos-riscv64-vf2/kairos.Dockerfile under QEMU. Pushes to quay.io
-# only from main; pull requests just validate the build. The HDMI image
-# (Dockerfile.hdmi) needs a kernel built by hand and is not built here.
+# Builds nodes/kairos-riscv64-vf2/Dockerfile for riscv64. The kernel stage
+# cross-compiles on the runner; the image stage runs under QEMU. Pushes to
+# quay.io only from main; pull requests just validate the build.
 on:
   push:
     branches:
@@ -40,7 +40,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           platforms: linux/riscv64
-          file: nodes/kairos-riscv64-vf2/kairos.Dockerfile
+          file: nodes/kairos-riscv64-vf2/Dockerfile
           context: nodes/kairos-riscv64-vf2
           tags: |
             quay.io/mauromorales/kairos-riscv64-vf2:v4.4.0
