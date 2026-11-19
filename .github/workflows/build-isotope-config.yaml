@@ -26,6 +26,11 @@ on:
 permissions:
   contents: read
 
+# One run at a time for a tag: two runs must not both find the tag free.
+concurrency:
+  group: isotope-config-${{ inputs.flavor || 'sway' }}-${{ inputs.isotope_version || 'v0.0.22' }}-${{ inputs.label || 'config' }}
+  cancel-in-progress: false
+
 env:
   IMAGE_REPO: quay.io/mauromorales/isotope
   VERSION: ${{ inputs.isotope_version || 'v0.0.22' }}
@@ -37,24 +42,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Check the inputs
+        shell: bash
+        # Whole-string matches: a value with a second line must not pass and
+        # then write its own lines into GITHUB_ENV.
         run: |
-          case "$FLAVOR" in sway|i3|cosmic|niri) ;; *) echo "unknown flavor $FLAVOR"; exit 1 ;; esac
-          echo "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || { echo "bad release $VERSION"; exit 1; }
-          echo "$LABEL" | grep -Eq '^[a-z0-9][a-z0-9.-]*$' || { echo "bad label $LABEL"; exit 1; }
+          case "$FLAVOR" in sway|i3|cosmic|niri) ;; *) echo "unknown flavor"; exit 1 ;; esac
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "bad release"; exit 1; }
+          [[ "$LABEL" =~ ^[a-z0-9][a-z0-9.-]{0,40}$ ]] || { echo "bad label"; exit 1; }
           echo "TAG=${FLAVOR}-${VERSION}-${LABEL}" >> "$GITHUB_ENV"
-
-      # A tag names one image for good: a machine that was tested on it must
-      # find the same image under that name later.
-      - name: Refuse a tag that exists
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          if docker manifest inspect "${IMAGE_REPO}:${TAG}" >/dev/null 2>&1; then
-            echo "${IMAGE_REPO}:${TAG} exists. Choose another label."
-            exit 1
-          fi
 
       - name: Reclaim runner disk space
         run: |
@@ -78,11 +76,29 @@ jobs:
 
       - name: Login to Quay
         if: github.event_name == 'workflow_dispatch'
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: quay.io
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      # A tag names one image for good: a machine that was tested on it must
+      # find the same image under that name later. Only the registry's own
+      # "no such manifest" means the tag is free; any other failure (network,
+      # auth, rate limit) stops the run and nothing is pushed.
+      - name: Refuse a tag that exists
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          if out=$(docker manifest inspect "${IMAGE_REPO}:${TAG}" 2>&1); then
+            echo "${IMAGE_REPO}:${TAG} exists. Choose another label."
+            exit 1
+          fi
+          if ! grep -Eqi 'manifest unknown|no such manifest|not found' <<<"$out"; then
+            echo "Could not tell whether ${IMAGE_REPO}:${TAG} exists:"
+            echo "$out"
+            exit 1
+          fi
 
       - name: Push the image
         if: github.event_name == 'workflow_dispatch'

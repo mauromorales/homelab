@@ -26,6 +26,11 @@ tag that exists. A machine that runs Isotope takes it with:
 isotope upgrade --image quay.io/mauromorales/isotope:sway-v0.0.22-config
 ```
 
+The `isotope` command in this image is always the one of the pinned fork
+commit, which is based on Isotope v0.0.22 plus the changes on `main` up to
+2026-11-19. Build it on v0.0.22. On a later release the command would be
+older than the image; move the pin first.
+
 After the upgrade, the first good boot records generation 1. From then on
 `sudo isotope config status` says what the config is and what the last boot
 repaired. To go back, upgrade to the release image again; `/oem/.isotope-config`
