@@ -1,0 +1,33 @@
+# VisionFive 2 image with the patched JH7110 HDMI kernel instead of the Ubuntu one.
+# Context: this directory, with the output of kernel/build.sh in ./kernel-out
+# (modules-<rel>.tar.gz, vmlinuz-<rel>, dtb/, kernelrelease).
+# Build: docker buildx build --platform linux/riscv64 -f Dockerfile.hdmi \
+#          --build-arg KREL=$(cat kernel-out/kernelrelease) -t kairos-vf2-hdmi .
+FROM ubuntu:24.04
+ARG VERSION=v4.4.0
+ARG KREL
+ARG K3S_RISCV64_RELEASE=20260817
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN curl -fL "https://github.com/kairos-io/kairos/releases/download/${VERSION}/kairos-init-${VERSION}-linux-riscv64.tar.gz" \
+      | tar -xz -C /usr/local/bin kairos-init
+# Install step without the Ubuntu kernel packages.
+RUN kairos-init -l debug -s install --skip-step installKernel --version "${VERSION}"
+# Our kernel: modules under /lib/modules/<rel>, image as /boot/vmlinuz-<rel>, DTBs under /boot/dtb.
+ADD kernel-out/modules-${KREL}.tar.gz /
+COPY kernel-out/vmlinuz-${KREL} /boot/vmlinuz-${KREL}
+COPY kernel-out/dtb/ /boot/dtb/
+RUN depmod ${KREL}
+# The init step picks the newest /lib/modules/<rel>, links /boot/vmlinuz and builds the initrd.
+RUN kairos-init -l debug -s init --version "${VERSION}"
+
+RUN curl -fL -o /usr/bin/k3s "https://github.com/CARV-ICS-FORTH/k3s/releases/download/${K3S_RISCV64_RELEASE}/k3s-riscv64" && \
+    chmod +x /usr/bin/k3s && \
+    curl -sfL https://get.k3s.io -o /tmp/k3s-install.sh && chmod +x /tmp/k3s-install.sh && \
+    INSTALL_K3S_BIN_DIR=/usr/bin INSTALL_K3S_SKIP_DOWNLOAD=true INSTALL_K3S_SKIP_ENABLE=true \
+    INSTALL_K3S_SKIP_SELINUX_RPM=true /tmp/k3s-install.sh && rm -f /tmp/k3s-install.sh
+RUN mkdir -p /system/providers && \
+    curl -fL "https://github.com/kairos-io/kairos/releases/download/${VERSION}/provider-kairos-${VERSION}-linux-riscv64.tar.gz" \
+      | tar -xz -O provider-kairos > /system/providers/agent-provider-kairos && \
+    chmod +x /system/providers/agent-provider-kairos && \
+    ln -sf /system/providers/agent-provider-kairos /usr/bin/kairos
