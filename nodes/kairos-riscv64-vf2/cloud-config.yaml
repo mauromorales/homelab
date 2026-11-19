@@ -1,0 +1,19 @@
+#cloud-config
+
+hostname: "kairos-vf2"
+
+users:
+  - name: kairos
+    groups: ["admin"]
+    # Replace with your own public key. There is no default password on purpose.
+    ssh_authorized_keys:
+      - "ssh-ed25519 AAAA... you@example"
+
+k3s:
+  enabled: true
+  args:
+    - --write-kubeconfig-mode=644
+    - --disable=traefik
+    # The root filesystem is an overlay; containerd's overlayfs snapshotter
+    # cannot stack on it. See ../kairos-riscv64/README.md.
+    - --snapshotter=native

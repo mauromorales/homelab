@@ -1,0 +1,14 @@
+menuentry "Kairos HDMI (jh7110 dtb)" --id hdmi {
+  search --no-floppy --label --set=root COS_STATE
+  set img=/cOS/active.img
+  set label=COS_ACTIVE
+  if [ -d (loop0) ]; then
+    loopback -d loop0
+  fi
+  loopback loop0 /$img
+  set root=($root)
+  source (loop0)/etc/cos/bootargs.cfg
+  devicetree (loop0)/boot/dtb/jh7110-starfive-visionfive-2-v1.3b.dtb
+  linux (loop0)$kernel $kernelcmd ${extra_cmdline} ${extra_active_cmdline}
+  initrd (loop0)$initramfs
+}
