@@ -2,10 +2,18 @@
 # BASE_IMAGE has no default on purpose: the CI workflow always supplies it
 # (kairos-riscv64-base's pushed image), and a build without it should fail
 # loudly rather than silently resolve to an empty FROM.
-ARG KAIROS_INIT=latest
+# The upstream Kairos release the tools come from. Same version as
+# ../kairos-riscv64-vf2. The quay.io/kairos/kairos-init image has no riscv64
+# build for release tags, so kairos-init and provider-kairos are taken from the
+# Kairos release assets.
+ARG KAIROS_VERSION=v4.4.0
 ARG BASE_IMAGE
 
-FROM quay.io/kairos/kairos-init:${KAIROS_INIT} AS kairos-init
+FROM ubuntu:24.04 AS kairos-init
+ARG KAIROS_VERSION
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN curl -fL "https://github.com/kairos-io/kairos/releases/download/${KAIROS_VERSION}/kairos-init-${KAIROS_VERSION}-linux-riscv64.tar.gz" \
+      | tar -xz -C / kairos-init
 
 # BASE_IMAGE is nodes/kairos-riscv64/Dockerfile, built and pushed to quay.io
 # by this node's own -base CI job (mirrors every other node's
@@ -62,10 +70,10 @@ RUN curl -fL -o /usr/bin/k3s \
 # comment above). provider-kairos does publish a riscv64 release, so fetch it
 # the same way kairos-init would, instead of leaving the stanza with nothing
 # to read it.
-ARG PROVIDER_KAIROS_VERSION=v2.16.4
+ARG KAIROS_VERSION
 RUN mkdir -p /system/providers && \
     curl -fL -o /tmp/provider-kairos.tar.gz \
-        "https://github.com/kairos-io/provider-kairos/releases/download/${PROVIDER_KAIROS_VERSION}/provider-kairos-${PROVIDER_KAIROS_VERSION}-linux-riscv64.tar.gz" && \
+        "https://github.com/kairos-io/kairos/releases/download/${KAIROS_VERSION}/provider-kairos-${KAIROS_VERSION}-linux-riscv64.tar.gz" && \
     tar -xzf /tmp/provider-kairos.tar.gz -O provider-kairos > /system/providers/agent-provider-kairos && \
     chmod +x /system/providers/agent-provider-kairos && \
     ln -sf /system/providers/agent-provider-kairos /usr/bin/kairos && \
