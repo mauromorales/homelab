@@ -87,8 +87,10 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VERSION: ${{ inputs.release_version }}
-      IMAGE: quay.io/mauromorales/kairos-riscv64:ubuntu-24.04-standard-riscv64-visionfive2-${{ inputs.release_version }}-k3sv${{ env.K3S_VERSION }}
     steps:
+      - name: Set the image name
+        run: echo "IMAGE=quay.io/mauromorales/kairos-riscv64:ubuntu-24.04-standard-riscv64-visionfive2-${VERSION}-k3sv${K3S_VERSION}" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@v6
 
