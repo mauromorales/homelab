@@ -45,4 +45,6 @@ jobs:
           tags: |
             quay.io/mauromorales/kairos-riscv64-vf2:v4.4.0
             quay.io/mauromorales/kairos-riscv64-vf2:v4.4.0-${{ github.sha }}
+          cache-from: type=gha,scope=kairos-riscv64-vf2
+          cache-to: type=gha,mode=max,scope=kairos-riscv64-vf2
           push: ${{ github.event_name != 'pull_request' }}
