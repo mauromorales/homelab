@@ -27,6 +27,13 @@ rebuilt since the fix's kairos-sdk release shipped. Building from `main`
 picks it up immediately; a fresh AuroraBoot release will make this step
 unnecessary.
 
+## Versions
+
+Built from Kairos v4.4.0 (`kairos-init` and `provider-kairos` from the Kairos release
+assets) and the CARV-ICS-FORTH k3s fork, the same as
+[`../kairos-riscv64-vf2`](../kairos-riscv64-vf2). Each release names its own version,
+for example `0.2.0`, not the Kairos one.
+
 ## k3s
 
 [k3s](https://k3s.io) has no official riscv64 release yet — see
