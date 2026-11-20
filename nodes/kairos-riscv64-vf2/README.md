@@ -28,7 +28,7 @@ Not tested: TPM, k0s, NVMe on the final build, boot time.
 [`Dockerfile`](./Dockerfile) builds one image: Kairos v4.4.0 with a patched
 7.4-rc1 kernel that has the HDMI driver. The kernel is built inside the Docker
 build (cross-compiled, not under QEMU). Published to
-`quay.io/mauromorales/kairos-riscv64-vf2` by
+`quay.io/mauromorales/kairos-riscv64`, tagged `ubuntu-24.04-standard-riscv64-visionfive2-<version>-k3sv<k3s>`, by
 [`build-kairos-riscv64-vf2.yaml`](../../.github/workflows/build-kairos-riscv64-vf2.yaml).
 A manual run of that workflow with `release_version` set also builds a live ISO
 and creates a draft GitHub Release, `kairos-riscv64-vf2-v<version>`.

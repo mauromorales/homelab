@@ -104,7 +104,9 @@ jobs:
         env:
           KUBERNETES_VERSION: v1.36.3
         run: |
-          echo "name=kairos-ubuntu-24.04-standard-riscv64-generic-${{ steps.version.outputs.value }}-k3sv${KUBERNETES_VERSION#v}" >> "$GITHUB_OUTPUT"
+          name="kairos-ubuntu-24.04-standard-riscv64-generic-${{ steps.version.outputs.value }}-k3sv${KUBERNETES_VERSION#v}"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "oci=${name#kairos-}" >> "$GITHUB_OUTPUT"
 
       # kairos.Dockerfile builds FROM the pushed base image
       # (kairos-riscv64-base, above), matching every other node's
@@ -234,7 +236,7 @@ jobs:
           file: nodes/kairos-riscv64/Dockerfile.img
           platforms: linux/riscv64
           push: true
-          tags: quay.io/mauromorales/kairos-riscv64:${{ steps.version.outputs.value }}-img
+          tags: quay.io/mauromorales/kairos-riscv64:${{ steps.artifact.outputs.oci }}-img
           build-args: |
             ARTIFACT=${{ steps.raw.outputs.path }}
 
@@ -253,7 +255,7 @@ jobs:
         run: |
           version="${{ inputs.release_version }}"
           tag="kairos-riscv64-v${version}"
-          img_ref="quay.io/mauromorales/kairos-riscv64:${version}-img"
+          img_ref="quay.io/mauromorales/kairos-riscv64:${{ steps.artifact.outputs.oci }}-img"
           raw_sha256="$(cut -d' ' -f1 output/*.raw.sha256)"
 
           # --prerelease is a semver signal, not an "is this experimental"
@@ -267,8 +269,8 @@ jobs:
           gh release create "$tag" \
             output/${{ steps.artifact.outputs.name }}.iso \
             output/${{ steps.artifact.outputs.name }}.iso.sha256 \
-            --title "Kairos riscv64 v${version}" \
-            --notes "Experimental riscv64 Kairos image. See nodes/kairos-riscv64/README.md for what this is and how to test it." \
+            --title "Kairos riscv64 v${version} (Ubuntu 24.04, Kairos v4.4.0, k3s v1.36.3)" \
+            --notes "Experimental riscv64 Kairos image on Ubuntu 24.04, built from Kairos v4.4.0 with k3s v1.36.3 from the CARV-ICS-FORTH fork (not an official k3s release). See nodes/kairos-riscv64/README.md for what this is and how to test it." \
             "${prerelease_flag[@]}"
 
           # Raw image isn't attached above -- see the "Push RAW artifact to

@@ -18,7 +18,7 @@ Kairos Factory produces two artifacts per build:
 | ----- | ---- | ------ | -------------- |
 | [Kairos Ubuntu 22.04 rpi4](./nodes/thuroros/README.md) | Doorbell | ✅ 🏃 | [thuroros-v1.2.1](../../releases/tag/thuroros-v1.2.1) ([all](../../releases?q=thuroros-v&expanded=true)), image on [quay.io](https://quay.io/repository/mauromorales/thuroros?tab=tags) |
 | [Kairos riscv64](./nodes/kairos-riscv64/README.md) | Community riscv64 hardware test image | 🔄 | [kairos-riscv64-v0.1.3](../../releases/tag/kairos-riscv64-v0.1.3) ([all](../../releases?q=kairos-riscv64-v&expanded=true)) |
-| [Kairos riscv64 VisionFive 2](./nodes/kairos-riscv64-vf2/README.md) | Community StarFive VisionFive 2 image with HDMI, Kairos v4.4.0 | 🔄 | [kairos-riscv64-vf2-v0.1.0](../../releases/tag/kairos-riscv64-vf2-v0.1.0), `quay.io/mauromorales/kairos-riscv64-vf2:0.1.0` |
+| [Kairos riscv64 VisionFive 2](./nodes/kairos-riscv64-vf2/README.md) | Community StarFive VisionFive 2 image with HDMI, Ubuntu 24.04, Kairos v4.4.0 | 🔄 | [kairos-riscv64-vf2-v0.1.0](../../releases/tag/kairos-riscv64-vf2-v0.1.0), `quay.io/mauromorales/kairos-riscv64:ubuntu-24.04-standard-riscv64-visionfive2-0.1.0-k3sv1.36.3` |
 | [Kairos rpi5](./nodes/kairos-rpi5/README.md) | Raspberry Pi 5 hardware bring-up | 🔄 | none yet |
 | [Kairos Hadron v0.5.1 NVIDIA amd64](./nodes/helios/README.md) | amd64 GPU worker (k0s) | 🔄 | none yet, image on [quay.io](https://quay.io/repository/mauromorales/helios?tab=tags) |
 
