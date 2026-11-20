@@ -1,0 +1,79 @@
+name: 'Build Isotope i3 splash test image'
+
+on:
+  workflow_dispatch:
+    inputs:
+      isotope_version:
+        description: 'Isotope release the image is built on'
+        required: false
+        default: 'v0.0.22'
+        type: string
+      label:
+        description: 'What differs, used in the tag: <release>-<label>'
+        required: false
+        default: 'splash-initrd'
+        type: string
+  pull_request:
+    paths:
+      - 'nodes/isotope-i3-splash/**'
+      - '.github/workflows/build-isotope-i3-splash.yaml'
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_REPO: quay.io/mauromorales/isotope
+  # Pinned: the splash change (branch isotope-splash-one-scale on the
+  # mauro-agent fork).
+  SPLASH_REPO: mauro-agent/isotope
+  SPLASH_SHA: 597c3bfef3c792278b6bdf7e065ee0aecf6952a7
+
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Checkout the splash change
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.SPLASH_REPO }}
+          ref: ${{ env.SPLASH_SHA }}
+          path: splash-src
+
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Choose the tag, and refuse one that exists
+        run: |
+          tag="${{ inputs.isotope_version || 'v0.0.22' }}-${{ inputs.label || 'splash-initrd' }}"
+          if docker manifest inspect "${IMAGE_REPO}:${tag}" >/dev/null 2>&1; then
+            echo "::error::${IMAGE_REPO}:${tag} already exists; pick another label"
+            exit 1
+          fi
+          echo "TAG=${tag}" >> "$GITHUB_ENV"
+
+      - name: Build the image
+        run: |
+          cp -r splash-src/splash nodes/isotope-i3-splash/splash
+          docker build \
+            --build-arg BASE_IMAGE="ghcr.io/kairos-community/isotope:i3-${{ inputs.isotope_version || 'v0.0.22' }}" \
+            -t isotope-i3-splash:dev nodes/isotope-i3-splash
+
+      - name: Push the image
+        run: |
+          docker tag isotope-i3-splash:dev "${IMAGE_REPO}:${TAG}"
+          docker push "${IMAGE_REPO}:${TAG}"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE_REPO}:${TAG}")
+          {
+            echo "Pushed \`${IMAGE_REPO}:${TAG}\`"
+            echo
+            echo "Digest: \`${digest}\`"
+            echo
+            echo "Upgrade: \`isotope upgrade --image ${IMAGE_REPO}:${TAG}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
