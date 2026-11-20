@@ -5,7 +5,7 @@ name: 'Build Kairos riscv64 VisionFive 2 image'
 # quay.io only from main; pull requests just validate the build.
 #
 # A release is a manual workflow_dispatch with release_version set (for
-# example 4.4.0). It builds and pushes the image, makes a live ISO from it
+# example 0.1.0). It builds and pushes the image, makes a live ISO from it
 # with AuroraBoot, and creates a DRAFT GitHub Release named
 # kairos-riscv64-vf2-v<version>. Nothing is public until the draft is
 # published by hand.
@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Version for a draft GitHub Release (for example 4.4.0). Leave empty to only build.'
+        description: 'Version for a draft GitHub Release (for example 0.1.0). Leave empty to only build.'
         required: false
         type: string
 
@@ -47,15 +47,27 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      # Our own version, not Kairos's: the release input, or 0.0.0-<sha> for a
+      # plain build. The Kairos and k3s versions are in the Dockerfile and the
+      # release notes. Tags are never moved or reused.
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ inputs.release_version }}" ]; then
+            echo "value=${{ inputs.release_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          build-args: |
+            VERSION=${{ steps.version.outputs.value }}
           platforms: linux/riscv64
           file: nodes/kairos-riscv64-vf2/Dockerfile
           context: nodes/kairos-riscv64-vf2
           tags: |
-            quay.io/mauromorales/kairos-riscv64-vf2:v4.4.0
-            quay.io/mauromorales/kairos-riscv64-vf2:v4.4.0-${{ github.sha }}
+            quay.io/mauromorales/kairos-riscv64-vf2:${{ steps.version.outputs.value }}
           cache-from: type=gha,scope=kairos-riscv64-vf2
           cache-to: type=gha,mode=max,scope=kairos-riscv64-vf2
           push: ${{ github.event_name != 'pull_request' }}
@@ -66,7 +78,10 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VERSION: ${{ inputs.release_version }}
-      IMAGE: quay.io/mauromorales/kairos-riscv64-vf2:v4.4.0-${{ github.sha }}
+      # Kubernetes version the CARV-ICS-FORTH k3s fork reports. Bump with
+      # K3S_RISCV64_RELEASE in the Dockerfile.
+      KUBERNETES_VERSION: v1.36.3
+      IMAGE: quay.io/mauromorales/kairos-riscv64-vf2:${{ inputs.release_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -112,7 +127,7 @@ jobs:
       - name: Build ISO
         run: |
           mkdir -p output
-          name="kairos-ubuntu-24.04-standard-riscv64-visionfive2-v${VERSION}-k3sv1.36.3"
+          name="kairos-ubuntu-24.04-standard-riscv64-visionfive2-${VERSION}-k3sv${KUBERNETES_VERSION#v}"
           echo "ISO_NAME=$name" >> "$GITHUB_ENV"
           sudo ./auroraboot --debug build-iso --arch riscv64 --output ./output/ \
             --override-name "$name" "docker:$IMAGE"
@@ -130,11 +145,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="kairos-riscv64-vf2-v${VERSION}"
+          df=nodes/kairos-riscv64-vf2/Dockerfile
+          kairos="$(grep -oP '^ARG KAIROS_VERSION=\K.*' $df)"
+          k3s_fork="$(grep -oP '^ARG K3S_RISCV64_RELEASE=\K.*' $df)"
+          kernel="$(grep -oP '^ARG KERNEL_TAG=\K.*' $df)"
           sha256="$(cut -d' ' -f1 "output/$ISO_NAME.iso.sha256")"
           cat > notes.md <<NOTES
-          Kairos v4.4.0 for the StarFive VisionFive 2 (JH7110), riscv64, with k3s and a patched kernel that has HDMI. Community build, not an official Kairos release. Tracking: kairos-io/kairos#4635.
+          Community image for the StarFive VisionFive 2 (JH7110, riscv64) with HDMI. Not an official Kairos release. Tracking: kairos-io/kairos#4635.
 
-          Image: \`${IMAGE%-*}\` (also tagged \`${IMAGE}\`)
+          | Component | Version |
+          |---|---|
+          | Board | StarFive VisionFive 2 (v1.3B tested) |
+          | Kairos | ${kairos} |
+          | k3s | ${KUBERNETES_VERSION}, CARV-ICS-FORTH fork release ${k3s_fork} (not an official k3s release) |
+          | Kernel | Linux ${kernel} plus the unmerged JH7110 display patches |
+          | Base | Ubuntu 24.04 |
+
+          Container image: \`${IMAGE}\`
           ISO SHA256: \`${sha256}\`
 
           ## Install
@@ -149,5 +176,5 @@ jobs:
           gh release create "$tag" \
             "output/$ISO_NAME.iso" "output/$ISO_NAME.iso.sha256" \
             --draft --prerelease \
-            --title "Kairos riscv64 VisionFive 2 v${VERSION}" \
+            --title "Kairos riscv64 VisionFive 2 v${VERSION} (Kairos ${kairos}, k3s ${KUBERNETES_VERSION})" \
             --notes-file notes.md

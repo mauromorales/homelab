@@ -36,13 +36,17 @@ RUN export ARCH=riscv CROSS_COMPILE=riscv64-linux-gnu- && \
     mkdir -p /out/dtb && cp /linux/arch/riscv/boot/dts/starfive/jh7110-*.dtb /out/dtb/
 
 FROM ubuntu:24.04
-ARG VERSION=v4.4.0
+# KAIROS_VERSION is the upstream Kairos release the tools come from. VERSION is
+# the version of this image (our own, passed in by the workflow); it ends up in
+# the image's os-release, as with ../kairos-riscv64.
+ARG KAIROS_VERSION=v4.4.0
+ARG VERSION=0.0.0
 ARG K3S_RISCV64_RELEASE=20260817
 
 # kairos-init, provider-kairos and the Kairos tools come from the Kairos release:
 # the quay.io/kairos/kairos-init image has no riscv64 build.
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN curl -fL "https://github.com/kairos-io/kairos/releases/download/${VERSION}/kairos-init-${VERSION}-linux-riscv64.tar.gz" \
+RUN curl -fL "https://github.com/kairos-io/kairos/releases/download/${KAIROS_VERSION}/kairos-init-${KAIROS_VERSION}-linux-riscv64.tar.gz" \
       | tar -xz -C /usr/local/bin kairos-init
 # Install step without the Ubuntu kernel packages.
 RUN kairos-init -l debug -s install --skip-step installKernel --version "${VERSION}"
@@ -64,7 +68,7 @@ RUN curl -fL -o /usr/bin/k3s "https://github.com/CARV-ICS-FORTH/k3s/releases/dow
     INSTALL_K3S_SKIP_SELINUX_RPM=true /tmp/k3s-install.sh && rm -f /tmp/k3s-install.sh
 # The cloud-config `k3s:` stanza is read by provider-kairos at boot.
 RUN mkdir -p /system/providers && \
-    curl -fL "https://github.com/kairos-io/kairos/releases/download/${VERSION}/provider-kairos-${VERSION}-linux-riscv64.tar.gz" \
+    curl -fL "https://github.com/kairos-io/kairos/releases/download/${KAIROS_VERSION}/provider-kairos-${KAIROS_VERSION}-linux-riscv64.tar.gz" \
       | tar -xz -O provider-kairos > /system/providers/agent-provider-kairos && \
     chmod +x /system/providers/agent-provider-kairos && \
     ln -sf /system/providers/agent-provider-kairos /usr/bin/kairos
