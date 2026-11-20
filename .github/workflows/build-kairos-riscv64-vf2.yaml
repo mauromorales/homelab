@@ -3,6 +3,12 @@ name: 'Build Kairos riscv64 VisionFive 2 image'
 # Builds nodes/kairos-riscv64-vf2/Dockerfile for riscv64. The kernel stage
 # cross-compiles on the runner; the image stage runs under QEMU. Pushes to
 # quay.io only from main; pull requests just validate the build.
+#
+# A release is a manual workflow_dispatch with release_version set (for
+# example 4.4.0). It builds and pushes the image, makes a live ISO from it
+# with AuroraBoot, and creates a DRAFT GitHub Release named
+# kairos-riscv64-vf2-v<version>. Nothing is public until the draft is
+# published by hand.
 on:
   push:
     branches:
@@ -15,9 +21,14 @@ on:
       - 'nodes/kairos-riscv64-vf2/**'
       - '.github/workflows/build-kairos-riscv64-vf2.yaml'
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Version for a draft GitHub Release (for example 4.4.0). Leave empty to only build.'
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write # only used to create the draft release
 
 jobs:
   build:
@@ -48,3 +59,95 @@ jobs:
           cache-from: type=gha,scope=kairos-riscv64-vf2
           cache-to: type=gha,mode=max,scope=kairos-riscv64-vf2
           push: ${{ github.event_name != 'pull_request' }}
+
+  release:
+    if: ${{ inputs.release_version != '' }}
+    needs: build
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: ${{ inputs.release_version }}
+      IMAGE: quay.io/mauromorales/kairos-riscv64-vf2:v4.4.0-${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Login to Quay
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      # Pulling by platform does not need QEMU: the image is only stored,
+      # AuroraBoot reads its filesystem and never runs it.
+      - name: Pull the image
+        run: docker pull --platform linux/riscv64 "$IMAGE"
+
+      # The same AuroraBoot build as the generic riscv64 workflow. See the
+      # comments there for why it is built from source.
+      - name: Checkout AuroraBoot
+        uses: actions/checkout@v6
+        with:
+          repository: mauro-agent/AuroraBoot
+          ref: fix/riscv64-raw-efi-no-shim
+          path: auroraboot-src
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: auroraboot-src/go.mod
+
+      - name: Install AuroraBoot build and ISO dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpcsclite-dev squashfs-tools xorriso dosfstools mtools
+
+      - name: Build AuroraBoot
+        working-directory: auroraboot-src
+        run: |
+          mkdir -p internal/ui/dist
+          touch internal/ui/dist/.gitkeep
+          go build -ldflags "-X main.version=v0.0.0-riscv64-node" -o ../auroraboot .
+
+      - name: Build ISO
+        run: |
+          mkdir -p output
+          name="kairos-ubuntu-24.04-standard-riscv64-visionfive2-v${VERSION}-k3sv1.36.3"
+          echo "ISO_NAME=$name" >> "$GITHUB_ENV"
+          sudo ./auroraboot --debug build-iso --arch riscv64 --output ./output/ \
+            --override-name "$name" "docker:$IMAGE"
+          sudo chown -R "$(id -u):$(id -g)" output
+          ls -l output
+          size=$(stat -c %s "output/$name.iso")
+          # GitHub rejects release assets of 2 GiB or more.
+          if [ "$size" -ge 2147483648 ]; then
+            echo "ISO is $size bytes, over the 2 GiB release asset limit" >&2
+            exit 1
+          fi
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="kairos-riscv64-vf2-v${VERSION}"
+          sha256="$(cut -d' ' -f1 "output/$ISO_NAME.iso.sha256")"
+          cat > notes.md <<NOTES
+          Kairos v4.4.0 for the StarFive VisionFive 2 (JH7110), riscv64, with k3s and a patched kernel that has HDMI. Community build, not an official Kairos release. Tracking: kairos-io/kairos#4635.
+
+          Image: \`${IMAGE%-*}\` (also tagged \`${IMAGE}\`)
+          ISO SHA256: \`${sha256}\`
+
+          ## Install
+
+          1. Update U-Boot and OpenSBI in the board's SPI flash to 2025.10 (the factory 2021.10 cannot read USB).
+          2. Write the ISO to a USB stick and boot the board from it.
+          3. Over SSH or the serial console run \`kairos-agent manual-install --device /dev/sdX cloud-config.yaml\` with your own SSH key in the file.
+          4. Wait for it to finish, remove the stick and reboot. At the GRUB prompt type the HDMI entry from \`kernel/grubmenu\` to get the display.
+
+          The live ISO has no display output. Use serial or SSH until the installed system boots with the HDMI entry. Full steps and limitations: nodes/kairos-riscv64-vf2/README.md.
+          NOTES
+          gh release create "$tag" \
+            "output/$ISO_NAME.iso" "output/$ISO_NAME.iso.sha256" \
+            --draft --prerelease \
+            --title "Kairos riscv64 VisionFive 2 v${VERSION}" \
+            --notes-file notes.md

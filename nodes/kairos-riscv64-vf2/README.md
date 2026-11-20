@@ -30,6 +30,8 @@ Not tested: TPM, k0s, NVMe on the final build, boot time.
 build (cross-compiled, not under QEMU). Published to
 `quay.io/mauromorales/kairos-riscv64-vf2` by
 [`build-kairos-riscv64-vf2.yaml`](../../.github/workflows/build-kairos-riscv64-vf2.yaml).
+A manual run of that workflow with `release_version` set also builds a live ISO
+and creates a draft GitHub Release, `kairos-riscv64-vf2-v<version>`.
 For the stock Ubuntu kernel without HDMI, use the generic image in
 [`../kairos-riscv64`](../kairos-riscv64), or build your own with `kairos-init`.
 
@@ -84,6 +86,6 @@ riscv64 images, so the node joins through this script, not through an artifact.
 ## Install
 
 1. Update U-Boot (limitation 1).
-2. Write the ISO to a USB stick and boot the board from it.
+2. Download the ISO from the [release](../../releases/tag/kairos-riscv64-vf2-v4.4.0), write it to a USB stick and boot the board from it. The live ISO has no display output: use serial or SSH.
 3. Run `kairos-agent manual-install --device /dev/sdX cloud-config.yaml`.
-4. Wait for it to finish (limitation 3), then remove the ISO stick and reboot.
+4. Wait for it to finish (limitation 3), then remove the ISO stick and reboot. At the GRUB prompt, type the entry from `kernel/grubmenu` to get HDMI (limitation 2).
