@@ -2,7 +2,7 @@ name: 'Build Kairos Hadron NVIDIA image'
 
 # Builds the image, checks it with test-image.sh, and pushes it to quay.io.
 # On push and pull request the tag expires after 2 days. On workflow_dispatch
-# with a tag, the image is durable.
+# with a tag, the image is durable, and the run refuses a userspace version override.
 on:
   push:
     branches:
@@ -21,7 +21,7 @@ on:
         required: false
         type: string
       nvidia_userspace_version:
-        description: 'Userspace driver version. Leave empty to match the kernel module. A different value builds a deliberate mismatch.'
+        description: 'Userspace driver version. Leave empty to match the kernel module. A different value builds a deliberate mismatch and cannot be combined with a tag.'
         required: false
         type: string
 
@@ -46,9 +46,13 @@ jobs:
         id: tag
         env:
           INPUT_TAG: ${{ inputs.tag }}
+          INPUT_USER: ${{ inputs.nvidia_userspace_version }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           if [ -n "$INPUT_TAG" ]; then
+            if [ -n "$INPUT_USER" ]; then
+              echo "A durable tag cannot use nvidia_userspace_version. A mismatch build gets only an expiring test tag." >&2; exit 1
+            fi
             if [ "$GITHUB_REF" != "refs/heads/main" ]; then
               echo "A durable tag can only be pushed from main." >&2; exit 1
             fi
