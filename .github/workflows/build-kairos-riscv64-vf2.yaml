@@ -27,6 +27,11 @@ on:
         required: false
         type: string
 
+# Kubernetes version the CARV-ICS-FORTH k3s fork reports. Bump with
+# K3S_RISCV64_RELEASE in the Dockerfile.
+env:
+  K3S_VERSION: '1.36.3'
+
 permissions:
   contents: write # only used to create the draft release
 
@@ -58,6 +63,10 @@ jobs:
           else
             echo "value=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
+          # One Quay repo for every riscv64 image; the tag says what it is,
+          # in the same order as the ISO name.
+          version="$(grep '^value=' "$GITHUB_OUTPUT" | cut -d= -f2)"
+          echo "oci_tag=ubuntu-24.04-standard-riscv64-visionfive2-${version}-k3sv${K3S_VERSION}" >> "$GITHUB_OUTPUT"
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -67,7 +76,7 @@ jobs:
           file: nodes/kairos-riscv64-vf2/Dockerfile
           context: nodes/kairos-riscv64-vf2
           tags: |
-            quay.io/mauromorales/kairos-riscv64-vf2:${{ steps.version.outputs.value }}
+            quay.io/mauromorales/kairos-riscv64:${{ steps.version.outputs.oci_tag }}
           cache-from: type=gha,scope=kairos-riscv64-vf2
           cache-to: type=gha,mode=max,scope=kairos-riscv64-vf2
           push: ${{ github.event_name != 'pull_request' }}
@@ -78,11 +87,10 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VERSION: ${{ inputs.release_version }}
-      # Kubernetes version the CARV-ICS-FORTH k3s fork reports. Bump with
-      # K3S_RISCV64_RELEASE in the Dockerfile.
-      KUBERNETES_VERSION: v1.36.3
-      IMAGE: quay.io/mauromorales/kairos-riscv64-vf2:${{ inputs.release_version }}
     steps:
+      - name: Set the image name
+        run: echo "IMAGE=quay.io/mauromorales/kairos-riscv64:ubuntu-24.04-standard-riscv64-visionfive2-${VERSION}-k3sv${K3S_VERSION}" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -127,7 +135,7 @@ jobs:
       - name: Build ISO
         run: |
           mkdir -p output
-          name="kairos-ubuntu-24.04-standard-riscv64-visionfive2-${VERSION}-k3sv${KUBERNETES_VERSION#v}"
+          name="kairos-ubuntu-24.04-standard-riscv64-visionfive2-${VERSION}-k3sv${K3S_VERSION}"
           echo "ISO_NAME=$name" >> "$GITHUB_ENV"
           sudo ./auroraboot --debug build-iso --arch riscv64 --output ./output/ \
             --override-name "$name" "docker:$IMAGE"
@@ -157,7 +165,7 @@ jobs:
           |---|---|
           | Board | StarFive VisionFive 2 (v1.3B tested) |
           | Kairos | ${kairos} |
-          | k3s | ${KUBERNETES_VERSION}, CARV-ICS-FORTH fork release ${k3s_fork} (not an official k3s release) |
+          | k3s | v${K3S_VERSION}, CARV-ICS-FORTH fork release ${k3s_fork} (not an official k3s release) |
           | Kernel | Linux ${kernel} plus the unmerged JH7110 display patches |
           | Base | Ubuntu 24.04 |
 
@@ -176,5 +184,5 @@ jobs:
           gh release create "$tag" \
             "output/$ISO_NAME.iso" "output/$ISO_NAME.iso.sha256" \
             --draft --prerelease \
-            --title "Kairos riscv64 VisionFive 2 v${VERSION} (Kairos ${kairos}, k3s ${KUBERNETES_VERSION})" \
+            --title "Kairos riscv64 VisionFive 2 v${VERSION} (Ubuntu 24.04, Kairos ${kairos}, k3s v${K3S_VERSION})" \
             --notes-file notes.md
