@@ -1,0 +1,20 @@
+#!/bin/sh
+# XLibre/i3 session launcher used by ly. Ly owns the X server lifecycle and
+# supplies DISPLAY/XAUTHORITY; this wrapper supplies the desktop environment and
+# a session bus for notifications plus the PipeWire/WirePlumber user session.
+[ -f /etc/i3-desktop/env ] && . /etc/i3-desktop/env
+[ -f /etc/i3-desktop/env.local ] && . /etc/i3-desktop/env.local
+
+# Flatpak apps (the first-run browser among them) fail with "Authorization
+# required, but no authorization protocol specified" unless the sandbox can read
+# the X cookie. Ly keeps it at $XDG_RUNTIME_DIR/lyxauth, a path the sandbox does
+# not get, so pass that file in. The path is taken from the session, not
+# written down, so it follows the user's id.
+if [ -n "${XAUTHORITY:-}" ] && command -v flatpak >/dev/null 2>&1; then
+    flatpak override --user --filesystem="$XAUTHORITY:ro" --env=XAUTHORITY="$XAUTHORITY" >/dev/null 2>&1 || true
+fi
+
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && command -v dbus-run-session >/dev/null 2>&1; then
+    exec dbus-run-session -- i3 --config /etc/i3/config
+fi
+exec i3 --config /etc/i3/config

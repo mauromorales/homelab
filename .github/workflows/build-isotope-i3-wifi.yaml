@@ -55,8 +55,9 @@ jobs:
             /usr/lib/firmware/brcm/bcm43xx-0.fw.zst /usr/lib/firmware/brcm/bcm43xx_hdr-0.fw.zst
 
       # The image is pushed so a machine already running Isotope can take it with
-      # `isotope upgrade`, without writing a USB stick. Tags: i3-wifi-<release>
-      # moves with each build; i3-wifi-<release>-<sha> never moves.
+      # `isotope upgrade`, without writing a USB stick. One tag per build,
+      # i3-wifi-<release>-<commit>, and it never moves: a tag that is pushed
+      # again would stop matching the image somebody already tested.
       - name: Login to Quay
         uses: docker/login-action@v3
         with:
@@ -67,10 +68,10 @@ jobs:
       - name: Push the image
         run: |
           v="${{ inputs.isotope_version || 'v0.0.16' }}"
-          for tag in "i3-wifi-${v}" "i3-wifi-${v}-${GITHUB_SHA::7}"; do
-            docker tag isotope-i3-wifi:dev "${IMAGE_REPO}:${tag}"
-            docker push "${IMAGE_REPO}:${tag}"
-          done
+          tag="i3-wifi-${v}-${GITHUB_SHA::7}"
+          docker tag isotope-i3-wifi:dev "${IMAGE_REPO}:${tag}"
+          docker push "${IMAGE_REPO}:${tag}"
+          echo "Pushed ${IMAGE_REPO}:${tag}" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Build the ISO
         working-directory: isotope
