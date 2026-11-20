@@ -86,6 +86,6 @@ riscv64 images, so the node joins through this script, not through an artifact.
 ## Install
 
 1. Update U-Boot (limitation 1).
-2. Download the ISO from the [release](../../releases/tag/kairos-riscv64-vf2-v4.4.0), write it to a USB stick and boot the board from it. The live ISO has no display output: use serial or SSH.
+2. Download the ISO from the [release](../../releases/tag/kairos-riscv64-vf2-v0.1.0), write it to a USB stick and boot the board from it. The live ISO has no display output: use serial or SSH.
 3. Run `kairos-agent manual-install --device /dev/sdX cloud-config.yaml`.
 4. Wait for it to finish (limitation 3), then remove the ISO stick and reboot. At the GRUB prompt, type the entry from `kernel/grubmenu` to get HDMI (limitation 2).
